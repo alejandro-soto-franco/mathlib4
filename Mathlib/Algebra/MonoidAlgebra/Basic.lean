@@ -46,7 +46,7 @@ values on the monomials `single a 1`. -/]
 theorem nonUnitalAlgHom_ext [DistribMulAction R A] {φ₁ φ₂ : R[M] →ₙₐ[R] A}
     (h : ∀ x, φ₁ (single x 1) = φ₂ (single x 1)) : φ₁ = φ₂ :=
   NonUnitalAlgHom.to_distribMulActionHom_injective <|
-    Finsupp.distribMulActionHom_ext' fun a => DistribMulActionHom.ext_ring (h a)
+    MonoidAlgebra.distribMulActionHom_ext' fun a => DistribMulActionHom.ext_ring (h a)
 
 /-- See note [partially-applied ext lemmas]. -/
 @[ext high]
@@ -143,8 +143,8 @@ def curryAlgEquiv : A[M × N] ≃ₐ[R] A[N][M] where
   toRingEquiv := curryRingEquiv
   commutes' r := by
     ext
-    simp [curryRingEquiv, curryAddEquiv, algebraMap, MonoidAlgebra, algebraMap, Algebra.algebraMap,
-      singleOneRingHom, singleAddHom, curryAddEquiv, ← ofCoeff_single, ofCoeff]
+    simp [curryRingEquiv, curryAddEquiv, algebraMap, algebraMap, Algebra.algebraMap,
+      singleOneRingHom, singleAddHom, curryAddEquiv, ← ofCoeff_single]
 
 @[to_additive (attr := simp)]
 lemma curryAlgEquiv_single (m : M) (n : N) (a : A) :
@@ -153,7 +153,7 @@ lemma curryAlgEquiv_single (m : M) (n : N) (a : A) :
 @[to_additive (attr := simp)]
 lemma curryAlgEquiv_symm_single (m : M) (n : N) (a : A) :
     (curryAlgEquiv R).symm (single m <| single n a) = (single (m, n) a) := by
-  classical exact Finsupp.uncurry_single ..
+  simp [curryAlgEquiv, AlgEquiv.symm_apply_eq]
 
 end Algebra
 
@@ -309,7 +309,7 @@ theorem domCongr_symm (e : M ≃* N) : (domCongr R A e).symm = domCongr R A e.sy
 
 variable (R) in
 /-- Nested monoid algebras can be taken in an arbitrary order. -/
-@[to_additive (dont_translate := R)
+@[to_additive
 /-- Nested monoid algebras can be taken in an arbitrary order. -/]
 def commAlgEquiv : A[M][N] ≃ₐ[R] A[N][M] :=
   (curryAlgEquiv _).symm.trans <| .trans (domCongr _ _ <| .prodComm ..) (curryAlgEquiv _)
@@ -495,17 +495,24 @@ theorem nonUnitalAlgHom_ext' [DistribMulAction R A] {φ₁ φ₂ : R[M] →ₙ�
     (h : φ₁.toMulHom.comp (ofMagma R M) = φ₂.toMulHom.comp (ofMagma R M)) : φ₁ = φ₂ :=
   nonUnitalAlgHom_ext R <| DFunLike.congr_fun h
 
+set_option backward.isDefEq.respectTransparency false in
 /-- The functor `M ↦ R[M]`, from the category of magmas to the category of
 non-unital, non-associative algebras over `R` is adjoint to the forgetful functor in the other
 direction. -/
 @[simps apply_apply symm_apply]
 def liftMagma [Module R A] [IsScalarTower R A A] [SMulCommClass R A A] :
-    (Multiplicative M →ₙ* A) ≃ (R[M] →ₙₐ[R] A) :=
-  { (MonoidAlgebra.liftMagma R : (Multiplicative M →ₙ* A) ≃ (_ →ₙₐ[R] A)) with
-    toFun f :=
-      { (MonoidAlgebra.liftMagma R f :) with
-        toFun := fun a => sum a fun m t => t • f (Multiplicative.ofAdd m) }
-    invFun f := f.toMulHom.comp (ofMagma R M) }
+    (Multiplicative M →ₙ* A) ≃ (R[M] →ₙₐ[R] A) where
+  toFun f := {
+    toAddMonoidHom :=
+      (liftAddHom fun x ↦ (smulAddHom R A).flip (f <| .ofAdd x)).comp coeffAddEquiv.toAddMonoidHom
+    map_smul' t' a := by simp [Finsupp.smul_sum, sum_smul_index', mul_smul]
+    map_mul' a₁ a₂ := by
+      simpa [mul_def, sum_sum_index, add_smul, Finsupp.mul_sum, Finsupp.sum_mul,
+        smul_mul_smul_comm] using Finsupp.sum_comm ..
+  }
+  invFun F := F.toMulHom.comp (ofMagma R M)
+  left_inv f := by ext; simp
+  right_inv F := by ext; simp
 
 end NonUnitalNonAssocAlgebra
 

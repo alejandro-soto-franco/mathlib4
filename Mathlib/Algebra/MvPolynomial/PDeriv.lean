@@ -150,7 +150,7 @@ lemma aeval_sumElim_pderiv_inl {S τ : Type*} [CommRing S] [Algebra R S]
     cases q <;> simp [Pi.single_apply]
 
 lemma pderiv_sumToIter {σ ι} (p i) :
-    (sumToIter R σ ι p).pderiv i = sumToIter R σ ι (p.pderiv (.inl i)) := by
+    (sumRingEquiv R σ ι p).pderiv i = sumRingEquiv R σ ι (p.pderiv (.inl i)) := by
   classical
   induction p using MvPolynomial.induction_on with
   | C a => simp
