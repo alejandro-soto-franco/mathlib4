@@ -66,6 +66,8 @@ section TruncFinset
 
 variable [CommSemiring R] {s : Finset (σ →₀ ℕ)}
 
+set_option allowUnsafeReducibility true in
+attribute [local reducible] MvPolynomial MvPowerSeries in
 /-- Restrict the support of a multivariate power series to a finite set of monomials and
 obtain a multivariate polynomial. -/
 def truncFinset (R : Type*) [CommSemiring R] (s : Finset (σ →₀ ℕ)) :
@@ -74,7 +76,9 @@ def truncFinset (R : Type*) [CommSemiring R] (s : Finset (σ →₀ ℕ)) :
   map_add' _ _ := by simp [sum_add_distrib]
   map_smul' _ _ := by
     classical
-    ext; simp [MvPolynomial.coeff_sum]
+    ext
+    erw [AddMonoidAlgebra.coeff_smul]
+    simp [coeff, single, MvPolynomial.monomial]
 
 theorem truncFinset_apply (p : MvPowerSeries σ R) :
     truncFinset R s p = ∑ x ∈ s, MvPolynomial.monomial x (p.coeff x) := by rfl
