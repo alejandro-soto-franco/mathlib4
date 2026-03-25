@@ -42,7 +42,10 @@ syntax (name := recall) "recall " ident ppIndent(optDeclSig) (declVal)? : comman
 open Lean Meta Elab Command Term
 
 elab_rules : command
-  | `(recall $id $sig:optDeclSig $[$val?]?) => withoutModifyingEnv do
+  | `(recall $id $sig:optDeclSig $[$val?]?) =>
+    -- `recall` doesn't introduce new definitions, so suppress the unused variable linter.
+    withScope (fun sc => { sc with opts := sc.opts.set `linter.unusedVariables false }) <|
+    withoutModifyingEnv do
     let declName := id.getId
     addConstInfo id declName
     let info ← getConstInfo declName

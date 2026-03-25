@@ -93,3 +93,9 @@ axiom bar : Nat
 #guard_msgs in recall bar := bar
 
 recall List.cons_append (a : α) (as bs : List α) : (a :: as) ++ bs = a :: (as ++ bs) := rfl
+
+-- Test that the unused variable linter does not fire on `recall`.
+-- The argument `(h : a = b)` only appears in the type, not the proof body,
+-- so without suppression it would trigger an "unused variable" warning.
+#guard_msgs in
+recall Eq.symm {α : Sort _} {a b : α} (h : a = b) : b = a
