@@ -62,7 +62,7 @@ function of `(x, t)`. -/
 noncomputable def boxEnergyDensity
     (ε : ℝ) (W : ℝ → ℝ) (u : (Fin (n + 1) → ℝ) × ℝ → ℝ)
     (x : Fin (n + 1) → ℝ) (t : ℝ) : ℝ :=
-  ε * ‖gradient_box (fun y => u (y, t)) x‖ ^ 2 / 2 + W (u (x, t)) / ε
+  ε * (∑ i, gradient_box (fun y => u (y, t)) x i ^ 2) / 2 + W (u (x, t)) / ε
 
 /-- The pointwise time derivative of the energy density:
 
@@ -168,19 +168,19 @@ structure IsBoxSolution
     ∃ D : ℝ,
       HasDerivAt
         (fun s : ℝ => ∫ x in Set.Icc a b, φ x *
-          (ε * ‖gradient_box (fun y => u (y, s)) x‖ ^ 2 / 2 +
+          (ε * (∑ i, gradient_box (fun y => u (y, s)) x i ^ 2) / 2 +
             W (u (x, s)) / ε)) D t ∧
       D ≤ C₂ *
         (∫ x in Set.Icc a b,
-          (ε * ‖gradient_box (fun y => u (y, t)) x‖ ^ 2 / 2 +
+          (ε * (∑ i, gradient_box (fun y => u (y, t)) x i ^ 2) / 2 +
             W (u (x, t)) / ε))
   /-- Total-energy antitone in time (paper eq. 6). -/
   totalEnergy_decay : ∀ t₁ t₂ : ℝ, 0 ≤ t₁ → t₁ ≤ t₂ →
     (∫ x in Set.Icc a b,
-        (ε * ‖gradient_box (fun y => u (y, t₂)) x‖ ^ 2 / 2 +
+        (ε * (∑ i, gradient_box (fun y => u (y, t₂)) x i ^ 2) / 2 +
           W (u (x, t₂)) / ε)) ≤
       ∫ x in Set.Icc a b,
-        (ε * ‖gradient_box (fun y => u (y, t₁)) x‖ ^ 2 / 2 +
+        (ε * (∑ i, gradient_box (fun y => u (y, t₁)) x i ^ 2) / 2 +
           W (u (x, t₁)) / ε)
 
 namespace IsBoxSolution
@@ -192,7 +192,7 @@ variable {a b : Fin (n + 1) → ℝ} {ε : ℝ} {W σ : ℝ → ℝ}
 integrated over `Icc a b`. -/
 noncomputable def boxTotalEnergy (_h : IsBoxSolution a b ε W σ u) (t : ℝ) : ℝ :=
   ∫ x in Set.Icc a b,
-    (ε * ‖gradient_box (fun y => u (y, t)) x‖ ^ 2 / 2 + W (u (x, t)) / ε)
+    (ε * (∑ i, gradient_box (fun y => u (y, t)) x i ^ 2) / 2 + W (u (x, t)) / ε)
 
 /-- Total energy is monotone decreasing in `t` on `[0, ∞)`. Direct
 consequence of the `totalEnergy_decay` axiom of `IsBoxSolution`. -/
@@ -217,15 +217,15 @@ theorem localizedDissipation (h : IsBoxSolution a b ε W σ u)
     (C₂ : ℝ) (hC₂ : 0 ≤ C₂) (hφ_bd : ∀ x, φ x ≤ C₂)
     (t₁ t₂ : ℝ) (ht₁ : 0 ≤ t₁) (ht : t₁ ≤ t₂) :
     (∫ x in Set.Icc a b, φ x *
-        (ε * ‖gradient_box (fun y => u (y, t₂)) x‖ ^ 2 / 2 +
+        (ε * (∑ i, gradient_box (fun y => u (y, t₂)) x i ^ 2) / 2 +
           W (u (x, t₂)) / ε)) -
       (∫ x in Set.Icc a b, φ x *
-        (ε * ‖gradient_box (fun y => u (y, t₁)) x‖ ^ 2 / 2 +
+        (ε * (∑ i, gradient_box (fun y => u (y, t₁)) x i ^ 2) / 2 +
           W (u (x, t₁)) / ε)) ≤
     C₂ * ∫ s in t₁..t₂, h.boxTotalEnergy s := by
   -- Define the test-function-localized energy.
   set f : ℝ → ℝ := fun s => ∫ x in Set.Icc a b, φ x *
-    (ε * ‖gradient_box (fun y => u (y, s)) x‖ ^ 2 / 2 + W (u (x, s)) / ε)
+    (ε * (∑ i, gradient_box (fun y => u (y, s)) x i ^ 2) / 2 + W (u (x, s)) / ε)
     with hf_def
   -- Pointwise extraction of derivatives D(s) and bounds on `[t₁, t₂]`.
   have hderiv : ∀ s, 0 ≤ s → ∃ D : ℝ,
@@ -325,11 +325,11 @@ theorem differential_dissipation_from_PDE
     ∃ D : ℝ,
       HasDerivAt
         (fun s : ℝ => ∫ x in Set.Icc a b, φ x *
-          (ε * ‖gradient_box (fun y => u (y, s)) x‖ ^ 2 / 2 +
+          (ε * (∑ i, gradient_box (fun y => u (y, s)) x i ^ 2) / 2 +
             W (u (x, s)) / ε)) D t ∧
       D ≤ C₂ *
         (∫ x in Set.Icc a b,
-          (ε * ‖gradient_box (fun y => u (y, t)) x‖ ^ 2 / 2 +
+          (ε * (∑ i, gradient_box (fun y => u (y, t)) x i ^ 2) / 2 +
             W (u (x, t)) / ε)) := by
   -- Witness D as the Leibniz-derivative of the localized energy.
   set D : ℝ := ∫ x in Set.Icc a b, φ x *
@@ -341,7 +341,9 @@ theorem differential_dissipation_from_PDE
     have hu2 : ContDiff ℝ 2 u := hsmooth.of_le (by norm_num : (2 : WithTop ℕ∞) ≤ ⊤)
     have hW2 : ContDiff ℝ 2 W := hW_smooth.of_le (by norm_num : (2 : WithTop ℕ∞) ≤ ⊤)
     have hφ0 : ContDiff ℝ 0 φ := hφ.of_le (by norm_num : (0 : WithTop ℕ∞) ≤ 2)
-    exact localizedEnergy_hasDerivAt_t hle hu2 hW2 φ hφ0 t
+    have h := localizedEnergy_hasDerivAt_t (ε := ε) (W := W) hle hu2 hW2 φ hφ0 t
+    simp only [boxEnergyDensity] at h
+    exact h
   · -- BLOCKER: bound D ≤ C₂ · boxTotalEnergy(t). This is the Schwarz/IBP
     -- step. Concretely, after `localizedEnergy_hasDerivAt_t` produces
     -- `D = ∫_Ω φ · (ε ⟨∇u, ∇u_t⟩ + W'(u) u_t / ε)`, the derivation goes:
