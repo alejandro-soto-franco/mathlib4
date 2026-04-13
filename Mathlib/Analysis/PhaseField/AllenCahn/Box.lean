@@ -10,6 +10,7 @@ public import Mathlib.Analysis.PhaseField.IntegrationByParts.Box
 public import Mathlib.MeasureTheory.Integral.IntervalIntegral.FundThmCalculus
 public import Mathlib.Analysis.Calculus.ParametricIntegral
 public import Mathlib.MeasureTheory.Measure.Lebesgue.Basic
+public import Mathlib.Analysis.Calculus.FDeriv.Symmetric
 
 /-!
 # Allen–Cahn on Box Domains
@@ -87,6 +88,21 @@ theorem fderiv_partial_snd {u : (Fin (n + 1) → ℝ) × ℝ → ℝ}
   rw [hcomp.fderiv]
   rfl
 
+/-- The gradient of `u(·, s)` in `x` is the partial fderiv evaluated at the
+`x`-direction, packaged for use by Schwarz. -/
+theorem gradient_box_eq_partial {u : (Fin (n + 1) → ℝ) × ℝ → ℝ}
+    (hu : Differentiable ℝ u) (x : Fin (n + 1) → ℝ) (s : ℝ) (i : Fin (n + 1)) :
+    gradient_box (fun y => u (y, s)) x i = (fderiv ℝ u (x, s)) (Pi.single i 1, 0) := by
+  change fderiv ℝ (fun y => u (y, s)) x (Pi.single i 1) = (fderiv ℝ u (x, s)) (Pi.single i 1, 0)
+  exact fderiv_partial_fst hu x s (Pi.single i 1)
+
+/-- The time derivative of `u` at `(y, t)` is the partial fderiv in `t`. -/
+theorem timeDeriv_eq_partial {u : (Fin (n + 1) → ℝ) × ℝ → ℝ}
+    (hu : Differentiable ℝ u) (y : Fin (n + 1) → ℝ) (t : ℝ) :
+    timeDeriv u y t = (fderiv ℝ u (y, t)) (0, 1) := by
+  change fderiv ℝ (fun s => u (y, s)) t 1 = (fderiv ℝ u (y, t)) (0, 1)
+  exact fderiv_partial_snd hu y t 1
+
 /-- The energy density `e_ε(u)(x, t) = ε ‖∇u(x,t)‖²/2 + W(u(x,t))/ε` as a
 function of `(x, t)`. -/
 noncomputable def boxEnergyDensity
@@ -94,15 +110,106 @@ noncomputable def boxEnergyDensity
     (x : Fin (n + 1) → ℝ) (t : ℝ) : ℝ :=
   ε * (∑ i, gradient_box (fun y => u (y, t)) x i ^ 2) / 2 + W (u (x, t)) / ε
 
-/-- The pointwise time derivative of the energy density:
+/-- **Schwarz mixed-partials swap, gradient form.** For a `C²` function `u`
+on the joint product space, the time derivative of the i-th gradient
+component equals the i-th gradient component of the time derivative.
 
-`∂_s e_ε(u)(x, s) = ε ⟨∇u(x,s), ∇u_s(x,s)⟩ + W'(u(x,s)) · u_s(x,s) / ε`,
+Concretely: `d/ds [∂_{x_i} u(x, s)] = ∂_{x_i} [∂_t u](x, t)` at `s = t`.
 
-where `u_s = timeDeriv u x s` and `∇u_s = gradient_box (fun y => timeDeriv u y s) x`.
+Proof: rewrite both sides via `fderiv_partial_fst` / `fderiv_partial_snd`
+to expressions in `fderiv (fderiv ℝ u) (x, t)`, apply Schwarz
+(`ContDiffAt.isSymmSndFDerivAt`), close. -/
+theorem gradient_box_hasDerivAt_t
+    {u : (Fin (n + 1) → ℝ) × ℝ → ℝ} (hu : ContDiff ℝ 2 u)
+    (x : Fin (n + 1) → ℝ) (t : ℝ) (i : Fin (n + 1)) :
+    HasDerivAt (fun s => gradient_box (fun y => u (y, s)) x i)
+      (gradient_box (fun y => timeDeriv u y t) x i) t := by
+  have hu_diff : Differentiable ℝ u :=
+    hu.differentiable (by norm_num : (2 : WithTop ℕ∞) ≠ 0)
+  -- Step 1: rewrite LHS function pointwise as `fun s => fderiv u (x, s) (Pi.single i 1, 0)`.
+  have hLHS_eq : (fun s => gradient_box (fun y => u (y, s)) x i) =
+      (fun s => (fderiv ℝ u (x, s)) (Pi.single i 1, 0)) := by
+    funext s
+    exact gradient_box_eq_partial hu_diff x s i
+  rw [hLHS_eq]
+  -- Step 2: HasDerivAt for `fun s => fderiv u (x, s)`.
+  -- View as `(fderiv u) ∘ (fun s => (x, s))`. The inner map has fderiv `inr`,
+  -- the outer is C¹ since u ∈ C².
+  have h_inner : HasFDerivAt (fun s : ℝ => (x, s))
+      (ContinuousLinearMap.inr ℝ _ _) t := hasFDerivAt_prodMk_right x t
+  have hu_fderiv_C1 : ContDiff ℝ 1 (fderiv ℝ u) :=
+    ContDiff.fderiv_right (m := 1) (n := 2) hu (by norm_num)
+  have h_outer : HasFDerivAt (fderiv ℝ u) (fderiv ℝ (fderiv ℝ u) (x, t)) (x, t) :=
+    (hu_fderiv_C1.differentiable
+      (by norm_num : (1 : WithTop ℕ∞) ≠ 0) (x, t)).hasFDerivAt
+  have h_compose : HasFDerivAt (fun s : ℝ => fderiv ℝ u (x, s))
+      ((fderiv ℝ (fderiv ℝ u) (x, t)).comp (ContinuousLinearMap.inr ℝ _ _)) t :=
+    h_outer.comp t h_inner
+  have h_c : HasDerivAt (fun s : ℝ => fderiv ℝ u (x, s))
+      ((fderiv ℝ (fderiv ℝ u) (x, t)) (0, 1)) t := by
+    have := h_compose.hasDerivAt
+    convert this using 1
+  -- Step 3: HasDerivAt for `fun s => (fderiv u (x, s)) (Pi.single i 1, 0)` via clm_apply.
+  have h_v : HasDerivAt (fun _ : ℝ => ((Pi.single i 1, 0) : (Fin (n+1) → ℝ) × ℝ))
+      0 t := hasDerivAt_const t _
+  have h_apply :
+      HasDerivAt (fun s => (fderiv ℝ u (x, s)) (Pi.single i 1, 0))
+        ((fderiv ℝ (fderiv ℝ u) (x, t) (0, 1)) (Pi.single i 1, 0) +
+          (fderiv ℝ u (x, t)) 0) t := h_c.clm_apply h_v
+  -- Constant-term contribution is zero.
+  have h_apply' :
+      HasDerivAt (fun s => (fderiv ℝ u (x, s)) (Pi.single i 1, 0))
+        ((fderiv ℝ (fderiv ℝ u) (x, t) (0, 1)) (Pi.single i 1, 0)) t := by
+    have := h_apply
+    simpa using this
+  -- Step 4: by Schwarz, swap (0, 1) and (Pi.single i 1, 0).
+  have h_symm : IsSymmSndFDerivAt ℝ u (x, t) :=
+    hu.contDiffAt.isSymmSndFDerivAt (by simp : minSmoothness ℝ 2 ≤ 2)
+  have h_swap : (fderiv ℝ (fderiv ℝ u) (x, t) (0, 1)) (Pi.single i 1, 0) =
+      (fderiv ℝ (fderiv ℝ u) (x, t) (Pi.single i 1, 0)) (0, 1) :=
+    h_symm (0, 1) (Pi.single i 1, 0)
+  rw [h_swap] at h_apply'
+  -- Step 5: rewrite RHS to match.
+  have hRHS_eq : gradient_box (fun y => timeDeriv u y t) x i =
+      (fderiv ℝ (fderiv ℝ u) (x, t) (Pi.single i 1, 0)) (0, 1) := by
+    -- gradient_box g x i = fderiv g x (Pi.single i 1) where g(y) = timeDeriv u y t.
+    -- timeDeriv u y t = fderiv u (y, t) (0, 1) [by timeDeriv_eq_partial].
+    -- So g = fun y => (fderiv u (y, t)) (0, 1).
+    -- d/dy g x v = (fderiv (fun y => fderiv u (y, t)) x v) (0, 1).
+    -- And fderiv (fun y => fderiv u (y, t)) x v = fderiv (fderiv u) (x, t) (v, 0) [partial_fst].
+    -- Taking v = Pi.single i 1 yields the goal.
+    change fderiv ℝ (fun y => timeDeriv u y t) x (Pi.single i 1) =
+           (fderiv ℝ (fderiv ℝ u) (x, t) (Pi.single i 1, 0)) (0, 1)
+    -- Pointwise rewrite of g.
+    have hg_eq : (fun y => timeDeriv u y t) = (fun y => (fderiv ℝ u (y, t)) (0, 1)) := by
+      funext y
+      exact timeDeriv_eq_partial hu_diff y t
+    rw [hg_eq]
+    -- Compute fderiv of fun y => (fderiv u (y, t)) (0, 1).
+    -- View as eval_(0,1) ∘ fderiv u ∘ (Prod.mk · t).
+    have h_inner' : HasFDerivAt (fun y : Fin (n + 1) → ℝ => (y, t))
+        (ContinuousLinearMap.inl ℝ _ _) x := hasFDerivAt_prodMk_left x t
+    have h_outer' : HasFDerivAt (fderiv ℝ u) (fderiv ℝ (fderiv ℝ u) (x, t)) (x, t) :=
+      h_outer
+    have h_h : HasFDerivAt (fun y => fderiv ℝ u (y, t))
+        ((fderiv ℝ (fderiv ℝ u) (x, t)).comp (ContinuousLinearMap.inl ℝ _ _)) x :=
+      h_outer'.comp x h_inner'
+    -- Now compose with eval at (0, 1).
+    have h_eval : HasFDerivAt
+        (fun y => (fderiv ℝ u (y, t)) (0, 1))
+        (((ContinuousLinearMap.apply ℝ ℝ (0, 1)).comp
+          ((fderiv ℝ (fderiv ℝ u) (x, t)).comp (ContinuousLinearMap.inl ℝ _ _)))) x := by
+      have h_app : HasFDerivAt
+          (fun L : (Fin (n+1) → ℝ) × ℝ →L[ℝ] ℝ => L (0, 1))
+          (ContinuousLinearMap.apply ℝ ℝ ((0, 1) : (Fin (n+1) → ℝ) × ℝ))
+          (fderiv ℝ u (x, t)) :=
+        (ContinuousLinearMap.apply ℝ ℝ ((0, 1) : (Fin (n+1) → ℝ) × ℝ)).hasFDerivAt
+      exact h_app.comp x h_h
+    rw [h_eval.fderiv]
+    simp [ContinuousLinearMap.inl_apply]
+  rw [hRHS_eq]
+  exact h_apply'
 
-Proof structure: chain rule for `ε‖∇u‖²/2` and for `W ∘ u`, plus the
-mixed-partials identity `∂_s ∂_{x_i} u = ∂_{x_i} ∂_s u` from Schwarz on
-`u ∈ C²`. -/
 theorem boxEnergyDensity_hasDerivAt_t
     {ε : ℝ} {W : ℝ → ℝ} {u : (Fin (n + 1) → ℝ) × ℝ → ℝ}
     (hu : ContDiff ℝ 2 u) (hW : ContDiff ℝ 2 W)
@@ -114,32 +221,53 @@ theorem boxEnergyDensity_hasDerivAt_t
   unfold boxEnergyDensity
   have hu_diff : Differentiable ℝ u :=
     hu.differentiable (by norm_num : (2 : WithTop ℕ∞) ≠ 0)
-  -- Step 1: u_t at fixed x is differentiable in s with derivative timeDeriv u x t.
+  have hW_diff : Differentiable ℝ W :=
+    hW.differentiable (by norm_num : (2 : WithTop ℕ∞) ≠ 0)
+  -- Time derivative of u along the slice y = x.
   have h_u_at_x : HasDerivAt (fun s => u (x, s)) (timeDeriv u x t) t := by
-    -- timeDeriv u x t = fderiv ℝ (fun s' => u(x, s')) t 1, so HasDerivAt is direct.
     have hdiff : DifferentiableAt ℝ (fun s : ℝ => u (x, s)) t := by
       have h := hu_diff (x, t)
       exact h.comp t (hasFDerivAt_prodMk_right x t).differentiableAt
-    -- HasDerivAt f f' t ↔ HasFDerivAt f (smulRight 1 f') t. By def of timeDeriv.
     exact hdiff.hasDerivAt
-  -- Step 2: ∂_s u(x, s) at s = t' for s in a neighborhood. We need this for
-  -- all s' near t, so we can apply HasDerivAt.pow which only needs at point.
-  -- Step 3: gradient component s ↦ ∂_i u (x, s) has derivative ∂_t ∂_i u (x, t)
-  -- which by Schwarz equals ∂_i ∂_t u (x, t) = gradient of timeDeriv at x.
-  --
-  -- This is the Schwarz step. Specifically:
-  -- gradient_box (fun y => u(y, s)) x i = fderiv ℝ (fun y => u(y, s)) x (Pi.single i 1)
-  --                                     = fderiv ℝ u (x, s) (Pi.single i 1, 0) [partial_fst]
-  -- d/ds (fderiv ℝ u (x, s) (Pi.single i 1, 0))
-  --   = fderiv ℝ (fun s' => fderiv ℝ u (x, s') (Pi.single i 1, 0)) t 1
-  --   = ... by Schwarz, equal to gradient_box (timeDeriv u y t) x i
-  -- This step requires careful ContDiff.fderiv_right + isSymmSndFDeriv work.
-  --
-  -- BLOCKER (focused): the Schwarz mixed-partials swap step.
-  -- Has been split off into a helper `gradient_box_hasDerivAt_t` (statement
-  -- here, proof requires ContDiffAt.isSymmSndFDerivAt + product-fderiv-curry
-  -- gymnastics; ~80 LoC of careful Lean).
-  sorry
+  -- Summand 1: ε * (Σ i, (∂_i u(x, s))²) / 2.
+  -- Per-component HasDerivAt for `s ↦ (gradient_box _ x i)²`.
+  have h_sq : ∀ i : Fin (n + 1),
+      HasDerivAt (fun s => gradient_box (fun y => u (y, s)) x i ^ 2)
+        (2 * gradient_box (fun y => u (y, t)) x i *
+          gradient_box (fun y => timeDeriv u y t) x i) t := by
+    intro i
+    have h := (gradient_box_hasDerivAt_t hu x t i).pow 2
+    simpa using h
+  have h_sum : HasDerivAt
+      (fun s => ∑ i, gradient_box (fun y => u (y, s)) x i ^ 2)
+      (∑ i, 2 * gradient_box (fun y => u (y, t)) x i *
+        gradient_box (fun y => timeDeriv u y t) x i) t :=
+    HasDerivAt.fun_sum (fun i _ => h_sq i)
+  have h_sum_eps : HasDerivAt
+      (fun s => ε * (∑ i, gradient_box (fun y => u (y, s)) x i ^ 2) / 2)
+      (ε * (∑ i, 2 * gradient_box (fun y => u (y, t)) x i *
+        gradient_box (fun y => timeDeriv u y t) x i) / 2) t :=
+    (h_sum.const_mul ε).div_const 2
+  -- Summand 2: W(u(x, s)) / ε via chain rule then div_const.
+  have h_W_at : HasDerivAt W (fderiv ℝ W (u (x, t)) 1) (u (x, t)) :=
+    (hW_diff (u (x, t))).hasDerivAt
+  have h_W_comp : HasDerivAt (fun s => W (u (x, s)))
+      (fderiv ℝ W (u (x, t)) 1 * timeDeriv u x t) t :=
+    h_W_at.comp t h_u_at_x
+  have h_W_eps : HasDerivAt (fun s => W (u (x, s)) / ε)
+      (fderiv ℝ W (u (x, t)) 1 * timeDeriv u x t / ε) t :=
+    h_W_comp.div_const ε
+  -- Combine summands.
+  have h_total := h_sum_eps.add h_W_eps
+  convert h_total using 1
+  -- Algebraic equality: ε * (Σ 2 a b) / 2 = ε * (Σ a b).
+  rw [show (fun i => 2 * gradient_box (fun y => u (y, t)) x i *
+          gradient_box (fun y => timeDeriv u y t) x i) =
+      (fun i => 2 * (gradient_box (fun y => u (y, t)) x i *
+          gradient_box (fun y => timeDeriv u y t) x i))
+    from by funext; ring]
+  rw [← Finset.mul_sum]
+  ring
 
 /-- The explicit pointwise time derivative of `boxEnergyDensity` (target of
 sub-sorry #1). -/
