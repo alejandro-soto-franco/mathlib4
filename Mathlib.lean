@@ -2207,6 +2207,7 @@ public import Mathlib.Analysis.Oscillation
 public import Mathlib.Analysis.PhaseField.AllenCahn.Box
 public import Mathlib.Analysis.PhaseField.AllenCahn.Discrepancy
 public import Mathlib.Analysis.PhaseField.AllenCahn.EnergyMeasure
+public import Mathlib.Analysis.PhaseField.AllenCahn.PaperEquations
 public import Mathlib.Analysis.PhaseField.AllenCahn.SemiDecreasing
 public import Mathlib.Analysis.PhaseField.IntegrationByParts
 public import Mathlib.Analysis.PhaseField.IntegrationByParts.Box

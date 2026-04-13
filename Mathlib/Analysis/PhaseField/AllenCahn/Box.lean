@@ -425,9 +425,16 @@ structure IsBoxSolution
         ε * laplacian_box (fun y => u (y, t)) x -
           fderiv ℝ W (u (x, t)) 1 / ε
   /-- Robin boundary condition `ε (∇u · ν) = −σ'(u)` on each face of the box.
-  Stated as a boundary flux identity (placeholder pending the boundary
-  measure API). -/
-  robin_bc : True
+  Encoded face-by-face: on the front face `x_i = b i` the outward normal is
+  `+e_i`, so `(∇u · ν) = ∂_{x_i} u`; on the back face `x_i = a i` the outward
+  normal is `-e_i`, so `(∇u · ν) = -∂_{x_i} u`. -/
+  robin_bc : ∀ (i : Fin (n + 1)) (t : ℝ),
+    (∀ y ∈ Set.Icc (a ∘ i.succAbove) (b ∘ i.succAbove),
+      ε * gradient_box (fun z => u (z, t)) (i.insertNth (b i) y) i =
+        -(fderiv ℝ σ (u (i.insertNth (b i) y, t)) 1)) ∧
+    (∀ y ∈ Set.Icc (a ∘ i.succAbove) (b ∘ i.succAbove),
+      -(ε * gradient_box (fun z => u (z, t)) (i.insertNth (a i) y) i) =
+        -(fderiv ℝ σ (u (i.insertNth (a i) y, t)) 1))
   /-- The instantaneous *localized* dissipation inequality. For every
   non-negative `C²` test function `φ` with `‖φ‖_∞ ≤ C₂` and every time
   `t ≥ 0`, the *full* localized energy
