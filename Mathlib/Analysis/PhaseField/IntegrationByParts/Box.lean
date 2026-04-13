@@ -8,6 +8,9 @@ module
 public import Mathlib.MeasureTheory.Integral.DivergenceTheorem
 public import Mathlib.MeasureTheory.Integral.Bochner.Basic
 public import Mathlib.Analysis.Calculus.ContDiff.Basic
+public import Mathlib.Analysis.Calculus.ContDiff.Comp
+public import Mathlib.Analysis.Calculus.ContDiff.Operations
+public import Mathlib.Analysis.Calculus.FDeriv.Mul
 
 /-!
 # Divergence Theorem and Green's Identities on Boxes
@@ -135,19 +138,177 @@ at `x` and vector field `Y` differentiable at `x`,
 
 `div(f · Y)(x) = ⟨∇f(x), Y(x)⟩ + f(x) · div Y(x)`.
 
-Algebraic identity underlying Green's first identity. Proof structure: the
-i-th component derivative is `∂ⱼ(f · Yᵢ)(x) = ∂ⱼf(x) · Yᵢ(x) + f(x) · ∂ⱼYᵢ(x)`
-by the scalar product rule (Mathlib `HasFDerivAt.smul`); summing on the
-diagonal `i = j` yields the identity. -/
+Proof: by `fderiv_fun_smul`, `D(f • Y)(x) = f(x) • DY(x) + (Df(x)).smulRight Y(x)`.
+Evaluating at `Pi.single i 1` and taking the `i`-th component, the per-component
+derivative is `f(x) · ∂ᵢYᵢ(x) + ∂ᵢf(x) · Yᵢ(x)`. Summing over `i` gives the
+identity, with the first sum collapsing into `f(x) · div Y(x)` and the second
+into `⟨∇f(x), Y(x)⟩`. -/
 theorem divergence_smul
     (f : (Fin n → ℝ) → ℝ) (Y : (Fin n → ℝ) → Fin n → ℝ) (x : Fin n → ℝ)
-    (_hf : DifferentiableAt ℝ f x) (_hY : DifferentiableAt ℝ Y x) :
+    (hf : DifferentiableAt ℝ f x) (hY : DifferentiableAt ℝ Y x) :
     divergence_box (fun y => f y • Y y) x =
       dotProduct_box (gradient_box f x) (Y x) + f x * divergence_box Y x := by
-  -- BLOCKER: requires per-component application of `HasFDerivAt.smul` on
-  -- `(fderiv ℝ Y x) (Pi.single i 1) i` followed by Finset sum manipulation.
-  -- Mathlib pieces (`fderiv_smul`, `Pi.single_apply`, `Finset.sum_add_distrib`)
-  -- are all available; closing this is mechanical Lean ~30 lines.
-  sorry
+  -- Step 1: derivative of the smul product.
+  have hsmul : fderiv ℝ (fun y => f y • Y y) x =
+      f x • fderiv ℝ Y x + (fderiv ℝ f x).smulRight (Y x) :=
+    fderiv_fun_smul hf hY
+  -- Step 2: per-component identity at `Pi.single i 1`.
+  have hcomp : ∀ i,
+      fderiv ℝ (fun y => f y • Y y) x (Pi.single i 1) i =
+        f x * fderiv ℝ Y x (Pi.single i 1) i +
+          fderiv ℝ f x (Pi.single i 1) * Y x i := by
+    intro i
+    rw [hsmul]
+    simp [ContinuousLinearMap.add_apply, ContinuousLinearMap.smul_apply,
+      ContinuousLinearMap.smulRight_apply, Pi.add_apply, Pi.smul_apply, smul_eq_mul]
+  -- Step 3: assemble the sum.
+  simp only [divergence_box, gradient_box, dotProduct_box]
+  rw [show (∑ i, fderiv ℝ (fun y => f y • Y y) x (Pi.single i 1) i) =
+        ∑ i, (f x * fderiv ℝ Y x (Pi.single i 1) i +
+              fderiv ℝ f x (Pi.single i 1) * Y x i)
+      from Finset.sum_congr rfl (fun i _ => hcomp i)]
+  rw [Finset.sum_add_distrib, ← Finset.mul_sum]
+  ring
+
+/-- **Divergence of the gradient equals the Laplacian.** Definitional after
+commuting the projection-from-pi and `fderiv`. -/
+theorem divergence_grad_eq_laplacian (g : (Fin n → ℝ) → ℝ)
+    (hg : ContDiff ℝ 2 g) (x : Fin n → ℝ) :
+    divergence_box (gradient_box g) x = laplacian_box g x := by
+  -- Both sides are `∑ i, (component derivative)`; we show termwise equality.
+  simp only [divergence_box, laplacian_box, gradient_box]
+  refine Finset.sum_congr rfl (fun i _ => ?_)
+  -- For each `i`, the i-th term on each side is a derivative at `x` applied
+  -- to `Pi.single i 1`. The LHS is the i-th component of `fderiv (fun y =>
+  -- (fderiv g y (Pi.single i 1))_{j}) x (Pi.single i 1)`; the RHS is
+  -- directly `fderiv (fun y => fderiv g y (Pi.single i 1)) x (Pi.single i 1)`.
+  -- These coincide by `hasFDerivAt_pi'`.
+  have hg_grad_diff : Differentiable ℝ (fun y => gradient_box g y) := by
+    -- `gradient_box g` is `C¹` because `g ∈ C²`.
+    intro z
+    -- It suffices that each component `fun y => fderiv g y (Pi.single i 1)`
+    -- is differentiable at z.
+    change DifferentiableAt ℝ (fun y j => fderiv ℝ g y (Pi.single j 1)) z
+    refine differentiableAt_pi.mpr (fun j => ?_)
+    have hg1 : ContDiff ℝ 1 (fderiv ℝ g) :=
+      ContDiff.fderiv_right (m := 1) (n := 2) hg (by norm_num)
+    have h := (hg1.differentiable (by norm_num : (1 : WithTop ℕ∞) ≠ 0)) z
+    exact (h.clm_apply (differentiableAt_const _))
+  -- Apply hasFDerivAt_pi to extract the i-th component of fderiv (gradient_box g).
+  have hΦ : HasFDerivAt (gradient_box g) (fderiv ℝ (gradient_box g) x) x :=
+    (hg_grad_diff x).hasFDerivAt
+  have h_iff := hasFDerivAt_pi'.mp hΦ i
+  -- h_iff : HasFDerivAt (fun y => gradient_box g y i) (proj i ∘L fderiv (gradient_box g) x) x
+  have hcomp_eq : fderiv ℝ (fun y => gradient_box g y i) x =
+      (ContinuousLinearMap.proj i).comp (fderiv ℝ (gradient_box g) x) := h_iff.fderiv
+  -- Apply both sides to `Pi.single i 1`.
+  have hev := congrArg (fun (φ : (Fin n → ℝ) →L[ℝ] ℝ) => φ (Pi.single i 1)) hcomp_eq
+  simp only [ContinuousLinearMap.coe_comp', Function.comp_apply,
+    ContinuousLinearMap.proj_apply] at hev
+  -- `gradient_box g y i = fderiv g y (Pi.single i 1)` by definition.
+  change fderiv ℝ (gradient_box g) x (Pi.single i 1) i =
+       fderiv ℝ (fun y => fderiv ℝ g y (Pi.single i 1)) x (Pi.single i 1)
+  rw [← hev]
+  rfl
+
+/-- **Green's first identity on a box.** For `f ∈ C¹` and `g ∈ C²` on `[a, b]`,
+
+`∫_{[a,b]} (⟨∇f, ∇g⟩ + f · Δg) dx = boxBoundaryFlux a b (f · ∇g)`.
+
+This is the divergence theorem applied to the vector field `f · ∇g`, using the
+product rule `divergence_smul` and the identity `div(∇g) = Δg`. -/
+theorem green_first_identity_box {a b : Fin (n + 1) → ℝ} (hle : a ≤ b)
+    (f g : (Fin (n + 1) → ℝ) → ℝ)
+    (hf : ContDiff ℝ 1 f) (hg : ContDiff ℝ 2 g)
+    (h_int : IntegrableOn
+      (fun x => dotProduct_box (gradient_box f x) (gradient_box g x) +
+                f x * laplacian_box g x) (Icc a b)) :
+    (∫ x in Icc a b, dotProduct_box (gradient_box f x) (gradient_box g x)) +
+        (∫ x in Icc a b, f x * laplacian_box g x) =
+      boxBoundaryFlux a b (fun y => f y • gradient_box g y) := by
+  -- Pointwise: div(f · ∇g)(x) = ⟨∇f, ∇g⟩ + f · div(∇g) = ⟨∇f, ∇g⟩ + f · Δg.
+  have hf_diff : Differentiable ℝ f :=
+    hf.differentiable (by norm_num : (1 : WithTop ℕ∞) ≠ 0)
+  have hg_grad_C1 : ContDiff ℝ 1 (gradient_box g) := by
+    change ContDiff ℝ 1 (fun y j => fderiv ℝ g y (Pi.single j 1))
+    refine contDiff_pi.mpr (fun j => ?_)
+    have : ContDiff ℝ 1 (fderiv ℝ g) :=
+      ContDiff.fderiv_right (m := 1) (n := 2) hg (by norm_num)
+    exact this.clm_apply contDiff_const
+  have hg_grad_diff : Differentiable ℝ (gradient_box g) :=
+    hg_grad_C1.differentiable (by norm_num : (1 : WithTop ℕ∞) ≠ 0)
+  have hpt : ∀ x,
+      divergence_box (fun y => f y • gradient_box g y) x =
+        dotProduct_box (gradient_box f x) (gradient_box g x) + f x * laplacian_box g x := by
+    intro x
+    rw [divergence_smul f (gradient_box g) x (hf_diff x) (hg_grad_diff x)]
+    rw [divergence_grad_eq_laplacian g hg x]
+  -- Integrate the pointwise identity, then apply box divergence theorem.
+  have hsmul_diff : Differentiable ℝ (fun y => f y • gradient_box g y) :=
+    fun y => (hf_diff y).smul (hg_grad_diff y)
+  -- The vector field is C¹.
+  have hsmul_C1' : ContDiff ℝ 1 (f • gradient_box g) := ContDiff.smul hf hg_grad_C1
+  have hsmul_C1 : ContDiff ℝ 1 (fun y => f y • gradient_box g y) := hsmul_C1'
+  have hsmul_int : IntegrableOn
+      (fun x => divergence_box (fun y => f y • gradient_box g y) x) (Icc a b) := by
+    rw [show (fun x => divergence_box (fun y => f y • gradient_box g y) x) =
+        (fun x => dotProduct_box (gradient_box f x) (gradient_box g x) +
+                  f x * laplacian_box g x)
+      from funext hpt]
+    exact h_int
+  have hdiv :=
+    divergence_theorem_box_flux hle (fun y => f y • gradient_box g y)
+      hsmul_C1.continuous.continuousOn
+      (fun x _ => hsmul_diff.differentiableAt.hasFDerivAt)
+      hsmul_int
+  -- Rewrite LHS of hdiv using the pointwise identity.
+  have hint_eq :
+      ∫ x in Icc a b, divergence_box (fun y => f y • gradient_box g y) x =
+        ∫ x in Icc a b,
+          (dotProduct_box (gradient_box f x) (gradient_box g x) +
+            f x * laplacian_box g x) := by
+    apply MeasureTheory.setIntegral_congr_fun measurableSet_Icc
+    intro x _
+    exact hpt x
+  rw [hint_eq] at hdiv
+  -- Continuity of the two summands, used for integrability.
+  have hf_cont : Continuous f := hf.continuous
+  have hf_grad_cont : Continuous (gradient_box f) := by
+    change Continuous (fun y j => fderiv ℝ f y (Pi.single j 1))
+    refine continuous_pi (fun j => ?_)
+    have : Continuous (fderiv ℝ f) :=
+      ContDiff.continuous_fderiv hf (by norm_num : (1 : WithTop ℕ∞) ≠ 0)
+    exact this.clm_apply continuous_const
+  have hg_grad_cont : Continuous (gradient_box g) := hg_grad_C1.continuous
+  have hg_lap_cont : Continuous (laplacian_box g) := by
+    change Continuous (fun x => ∑ i,
+      fderiv ℝ (fun y => fderiv ℝ g y (Pi.single i 1)) x (Pi.single i 1))
+    refine continuous_finset_sum _ (fun i _ => ?_)
+    have hg_fderiv_C1 : ContDiff ℝ 1 (fderiv ℝ g) :=
+      ContDiff.fderiv_right (m := 1) (n := 2) hg (by norm_num)
+    have hi_C1 : ContDiff ℝ 1 (fun y => fderiv ℝ g y (Pi.single i 1)) :=
+      hg_fderiv_C1.clm_apply contDiff_const
+    have : Continuous (fderiv ℝ (fun y => fderiv ℝ g y (Pi.single i 1))) :=
+      ContDiff.continuous_fderiv hi_C1 (by norm_num : (1 : WithTop ℕ∞) ≠ 0)
+    exact this.clm_apply continuous_const
+  have h_dot_cont : Continuous (fun x =>
+      dotProduct_box (gradient_box f x) (gradient_box g x)) := by
+    change Continuous (fun x => ∑ i, gradient_box f x i * gradient_box g x i)
+    refine continuous_finset_sum _ (fun i _ => ?_)
+    exact ((continuous_apply i).comp hf_grad_cont).mul
+      ((continuous_apply i).comp hg_grad_cont)
+  have h_fΔ_cont : Continuous (fun x => f x * laplacian_box g x) :=
+    hf_cont.mul hg_lap_cont
+  -- Integrability of each summand on Icc a b.
+  have h_dot_int :
+      IntegrableOn (fun x =>
+        dotProduct_box (gradient_box f x) (gradient_box g x)) (Icc a b) :=
+    h_dot_cont.continuousOn.integrableOn_Icc
+  have h_fΔ_int :
+      IntegrableOn (fun x => f x * laplacian_box g x) (Icc a b) :=
+    h_fΔ_cont.continuousOn.integrableOn_Icc
+  -- Split the integral of the sum into two integrals.
+  rw [MeasureTheory.integral_add h_dot_int h_fΔ_int] at hdiv
+  exact hdiv
 
 end MeasureTheory.PhaseField
