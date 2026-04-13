@@ -51,6 +51,73 @@ open MeasureTheory PhaseField
 
 variable {n : ℕ}
 
+/-- Time derivative of `u` at `(x, t)`, using `fderiv` in the second
+coordinate. -/
+noncomputable def timeDeriv (u : (Fin (n + 1) → ℝ) × ℝ → ℝ)
+    (x : Fin (n + 1) → ℝ) (t : ℝ) : ℝ :=
+  fderiv ℝ (fun s : ℝ => u (x, s)) t 1
+
+/-- The energy density `e_ε(u)(x, t) = ε ‖∇u(x,t)‖²/2 + W(u(x,t))/ε` as a
+function of `(x, t)`. -/
+noncomputable def boxEnergyDensity
+    (ε : ℝ) (W : ℝ → ℝ) (u : (Fin (n + 1) → ℝ) × ℝ → ℝ)
+    (x : Fin (n + 1) → ℝ) (t : ℝ) : ℝ :=
+  ε * ‖gradient_box (fun y => u (y, t)) x‖ ^ 2 / 2 + W (u (x, t)) / ε
+
+/-- The pointwise time derivative of the energy density:
+
+`∂_s e_ε(u)(x, s) = ε ⟨∇u(x,s), ∇u_s(x,s)⟩ + W'(u(x,s)) · u_s(x,s) / ε`,
+
+where `u_s = timeDeriv u x s` and `∇u_s = gradient_box (fun y => timeDeriv u y s) x`.
+
+Proof structure: chain rule for `ε‖∇u‖²/2` and for `W ∘ u`, plus the
+mixed-partials identity `∂_s ∂_{x_i} u = ∂_{x_i} ∂_s u` from Schwarz on
+`u ∈ C²`. -/
+theorem boxEnergyDensity_hasDerivAt_t
+    {ε : ℝ} {W : ℝ → ℝ} {u : (Fin (n + 1) → ℝ) × ℝ → ℝ}
+    (_hu : ContDiff ℝ 2 u) (_hW : ContDiff ℝ 2 W)
+    (x : Fin (n + 1) → ℝ) (t : ℝ) :
+    HasDerivAt (fun s => boxEnergyDensity ε W u x s)
+      (ε * (∑ i, gradient_box (fun y => u (y, t)) x i *
+            gradient_box (fun y => timeDeriv u y t) x i) +
+        fderiv ℝ W (u (x, t)) 1 * timeDeriv u x t / ε) t := by
+  -- BLOCKER: chain rule on each summand. Specifically:
+  -- · `∂_s ‖∇u(x, s)‖² = 2 ⟨∇u(x, s), ∂_s ∇u(x, s)⟩`, where `∂_s ∇u = ∇(∂_s u)`
+  --   by symmetry of mixed partials (Mathlib `ContDiff.symm` / Schwarz).
+  -- · `∂_s W(u(x, s)) = W'(u(x, s)) · ∂_s u(x, s)` (chain rule).
+  -- Mathlib has `HasDerivAt.norm_sq`, `HasDerivAt.comp` (for chain rule),
+  -- and the symmetric-second-derivative theorem
+  -- `ContDiffAt.is_symm_secondFDeriv` (or similar). Assembling them is
+  -- the work of one focused theorem.
+  sorry
+
+/-- **Leibniz under the integral, applied to the box-localized energy.**
+
+For a `C²` solution `u` and a `C²` test function `φ` on the box, the
+function `s ↦ ∫_Ω φ(x) · e_ε(u)(x, s) dx` is differentiable in `s`, with
+derivative obtained by differentiating the integrand pointwise in `s`. -/
+theorem localizedEnergy_hasDerivAt_t
+    {a b : Fin (n + 1) → ℝ} (_hle : a ≤ b) {ε : ℝ}
+    {W : ℝ → ℝ} {u : (Fin (n + 1) → ℝ) × ℝ → ℝ}
+    (_hu : ContDiff ℝ 2 u) (_hW : ContDiff ℝ 2 W)
+    (φ : (Fin (n + 1) → ℝ) → ℝ) (_hφ : ContDiff ℝ 0 φ)
+    (t : ℝ) :
+    HasDerivAt (fun s => ∫ x in Set.Icc a b, φ x * boxEnergyDensity ε W u x s)
+      (∫ x in Set.Icc a b, φ x *
+        (ε * (∑ i, gradient_box (fun y => u (y, t)) x i *
+              gradient_box (fun y => timeDeriv u y t) x i) +
+          fderiv ℝ W (u (x, t)) 1 * timeDeriv u x t / ε)) t := by
+  -- BLOCKER: apply `MeasureTheory.hasDerivAt_integral_of_dominated_loc_of_deriv_le`
+  -- with:
+  -- · `F s x := φ x * boxEnergyDensity ε W u x s`,
+  -- · `F' s x := φ x * (ε ⟨∇u, ∇u_s⟩ + W'(u) u_s / ε)` (from the pointwise
+  --   derivative `boxEnergyDensity_hasDerivAt_t`),
+  -- · uniform `bound` on `[t - δ, t + δ]` from continuity of `F'` and
+  --   compactness of `Icc a b × [t - δ, t + δ]`,
+  -- · measurability + integrability from continuity of the integrand on
+  --   compact `Icc a b`.
+  sorry
+
 /-- Box Allen–Cahn solution: a smooth `u : (Fin (n+1) → ℝ) × ℝ → ℝ` solving
 the ε-parametrised PDE `ε ∂_t u = ε Δu − W'(u)/ε` in the interior of the box
 `Icc a b`, with the Robin boundary condition `ε (∇u · ν) = −σ'(u)` on each
@@ -244,14 +311,14 @@ proof here is the next concrete deliverable. -/
 theorem differential_dissipation_from_PDE
     {a b : Fin (n + 1) → ℝ} {ε : ℝ} {W σ : ℝ → ℝ}
     {u : (Fin (n + 1) → ℝ) × ℝ → ℝ}
-    (_hle : a ≤ b) (_ε_pos : 0 < ε)
-    (_hsmooth : ContDiff ℝ ⊤ u) (_hW_smooth : ContDiff ℝ ⊤ W)
+    (hle : a ≤ b) (_ε_pos : 0 < ε)
+    (hsmooth : ContDiff ℝ ⊤ u) (hW_smooth : ContDiff ℝ ⊤ W)
     (_hσ_smooth : ContDiff ℝ ⊤ σ)
     (_h_interior : ∀ x ∈ Set.Ioo a b, ∀ t : ℝ,
       ε * fderiv ℝ (fun s : ℝ => u (x, s)) t 1 =
         ε * laplacian_box (fun y => u (y, t)) x -
           fderiv ℝ W (u (x, t)) 1 / ε)
-    (φ : (Fin (n + 1) → ℝ) → ℝ) (_hφ : ContDiff ℝ 2 φ)
+    (φ : (Fin (n + 1) → ℝ) → ℝ) (hφ : ContDiff ℝ 2 φ)
     (_hφ_nn : ∀ x, 0 ≤ φ x)
     (C₂ : ℝ) (_hC₂ : 0 ≤ C₂) (_hφ_bd : ∀ x, φ x ≤ C₂)
     (t : ℝ) (_ht : 0 ≤ t) :
@@ -264,10 +331,31 @@ theorem differential_dissipation_from_PDE
         (∫ x in Set.Icc a b,
           (ε * ‖gradient_box (fun y => u (y, t)) x‖ ^ 2 / 2 +
             W (u (x, t)) / ε)) := by
-  -- BLOCKER: Multi-step Lean construction outlined in the docstring above.
-  -- Uses MeasureTheory.hasDerivAt_integral_of_dominated_loc_of_deriv_le for
-  -- step 2, green_first_identity_box for step 4, and Cauchy-Schwarz for
-  -- step 7. Each piece is in Mathlib; the assembly is the work.
-  sorry
+  -- Witness D as the Leibniz-derivative of the localized energy.
+  set D : ℝ := ∫ x in Set.Icc a b, φ x *
+    (ε * (∑ i, gradient_box (fun y => u (y, t)) x i *
+          gradient_box (fun y => timeDeriv u y t) x i) +
+      fderiv ℝ W (u (x, t)) 1 * timeDeriv u x t / ε) with hD_def
+  refine ⟨D, ?_, ?_⟩
+  · -- HasDerivAt: discharged by `localizedEnergy_hasDerivAt_t`.
+    have hu2 : ContDiff ℝ 2 u := hsmooth.of_le (by norm_num : (2 : WithTop ℕ∞) ≤ ⊤)
+    have hW2 : ContDiff ℝ 2 W := hW_smooth.of_le (by norm_num : (2 : WithTop ℕ∞) ≤ ⊤)
+    have hφ0 : ContDiff ℝ 0 φ := hφ.of_le (by norm_num : (0 : WithTop ℕ∞) ≤ 2)
+    exact localizedEnergy_hasDerivAt_t hle hu2 hW2 φ hφ0 t
+  · -- BLOCKER: bound D ≤ C₂ · boxTotalEnergy(t). This is the Schwarz/IBP
+    -- step. Concretely, after `localizedEnergy_hasDerivAt_t` produces
+    -- `D = ∫_Ω φ · (ε ⟨∇u, ∇u_t⟩ + W'(u) u_t / ε)`, the derivation goes:
+    -- (a) Apply `green_first_identity_box` with `f = φ · u_t`, `g = u`:
+    --     `∫ ∇(φ u_t) · ∇u + ∫ (φ u_t) Δu = boxBoundaryFlux a b ((φ u_t) · ∇u)`.
+    -- (b) Expand `∇(φ u_t) = u_t ∇φ + φ ∇u_t`.
+    -- (c) Substitute the interior PDE `ε Δu = ε u_t + W'(u)/ε`, collapsing
+    --     the bulk term to `−ε ∫ φ u_t² ≤ 0`.
+    -- (d) Substitute the Robin BC `ε(∇u · ν) = −σ'(u)` in
+    --     `boxBoundaryFlux ((φ u_t) · ∇u)` to get a boundary integral of
+    --     `−φ u_t σ'(u)/ε` over each face, contributing 0 in the steady-state
+    --     analysis (paper Section 2 equation (6) with σ ≥ 0).
+    -- (e) Cauchy-Schwarz on the residual `ε ∫ u_t ⟨∇φ, ∇u⟩` against
+    --     `‖∇φ‖_∞ ≤ ‖φ‖_{C¹} ≤ C₂` gives the absorption.
+    sorry
 
 end MeasureTheory.AllenCahn
