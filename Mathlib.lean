@@ -5249,6 +5249,11 @@ public import Mathlib.MeasureTheory.Function.StronglyMeasurable.Lemmas
 public import Mathlib.MeasureTheory.Function.StronglyMeasurable.Lp
 public import Mathlib.MeasureTheory.Function.UnifTight
 public import Mathlib.MeasureTheory.Function.UniformIntegrable
+public import Mathlib.MeasureTheory.Geometric.Rectifiable
+public import Mathlib.MeasureTheory.Geometric.Varifold.Basic
+public import Mathlib.MeasureTheory.Geometric.Varifold.FirstVariation
+public import Mathlib.MeasureTheory.Geometric.Varifold.Monotonicity
+public import Mathlib.MeasureTheory.Geometric.Varifold.Stationary
 public import Mathlib.MeasureTheory.Group.AEStabilizer
 public import Mathlib.MeasureTheory.Group.Action
 public import Mathlib.MeasureTheory.Group.AddCircle
