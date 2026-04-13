@@ -59,6 +59,34 @@ noncomputable def timeDeriv (u : (Fin (n + 1) → ℝ) × ℝ → ℝ)
     (x : Fin (n + 1) → ℝ) (t : ℝ) : ℝ :=
   fderiv ℝ (fun s : ℝ => u (x, s)) t 1
 
+/-- **Partial fderiv from joint fderiv (x-slice).** For differentiable `u`,
+the partial derivative of `u` in its first argument equals the joint fderiv
+applied to the horizontal direction. -/
+theorem fderiv_partial_fst {u : (Fin (n + 1) → ℝ) × ℝ → ℝ}
+    (hu : Differentiable ℝ u) (x : Fin (n + 1) → ℝ) (t : ℝ)
+    (v : Fin (n + 1) → ℝ) :
+    fderiv ℝ (fun y => u (y, t)) x v =
+      fderiv ℝ u (x, t) (v, 0) := by
+  have h1 : HasFDerivAt (fun y : Fin (n + 1) → ℝ => (y, t))
+      (ContinuousLinearMap.inl ℝ _ _) x := hasFDerivAt_prodMk_left x t
+  have h2 : HasFDerivAt u (fderiv ℝ u (x, t)) (x, t) := (hu (x, t)).hasFDerivAt
+  have hcomp : HasFDerivAt (fun y => u (y, t))
+      ((fderiv ℝ u (x, t)).comp (ContinuousLinearMap.inl ℝ _ _)) x := h2.comp x h1
+  rw [hcomp.fderiv]
+  rfl
+
+/-- **Partial fderiv from joint fderiv (t-slice).** -/
+theorem fderiv_partial_snd {u : (Fin (n + 1) → ℝ) × ℝ → ℝ}
+    (hu : Differentiable ℝ u) (x : Fin (n + 1) → ℝ) (t : ℝ) (s : ℝ) :
+    fderiv ℝ (fun s' : ℝ => u (x, s')) t s = fderiv ℝ u (x, t) (0, s) := by
+  have h1 : HasFDerivAt (fun s' : ℝ => (x, s'))
+      (ContinuousLinearMap.inr ℝ _ _) t := hasFDerivAt_prodMk_right x t
+  have h2 : HasFDerivAt u (fderiv ℝ u (x, t)) (x, t) := (hu (x, t)).hasFDerivAt
+  have hcomp : HasFDerivAt (fun s' : ℝ => u (x, s'))
+      ((fderiv ℝ u (x, t)).comp (ContinuousLinearMap.inr ℝ _ _)) t := h2.comp t h1
+  rw [hcomp.fderiv]
+  rfl
+
 /-- The energy density `e_ε(u)(x, t) = ε ‖∇u(x,t)‖²/2 + W(u(x,t))/ε` as a
 function of `(x, t)`. -/
 noncomputable def boxEnergyDensity
@@ -442,14 +470,128 @@ theorem differential_dissipation_from_PDE
     -- These follow from joint smoothness of u, W, φ — we leave them sorry as
     -- separate focused gaps (they reduce to standard product-continuity arguments
     -- using the smoothness of the inputs).
+    have hu_diff : Differentiable ℝ u :=
+      hu2.differentiable (by norm_num : (2 : WithTop ℕ∞) ≠ 0)
+    have hu_cont : Continuous u := hu2.continuous
+    have hu_fderiv_cont : Continuous fun p : ((Fin (n+1) → ℝ) × ℝ) × ((Fin (n+1) → ℝ) × ℝ) =>
+        (fderiv ℝ u p.1) p.2 :=
+      ContDiff.continuous_fderiv_apply hu2 (by norm_num : (2 : WithTop ℕ∞) ≠ 0)
+    have hφ_cont : Continuous φ :=
+      hφ.continuous
+    have hW_cont : Continuous W := hW2.continuous
+    -- Rewrite gradient_box using fderiv_partial_fst, then continuity follows.
+    have hgrad_cont : ∀ i : Fin (n + 1), Continuous fun p : (Fin (n + 1) → ℝ) × ℝ =>
+        gradient_box (fun y => u (y, p.2)) p.1 i := by
+      intro i
+      have hrw : ∀ p : (Fin (n + 1) → ℝ) × ℝ,
+          gradient_box (fun y => u (y, p.2)) p.1 i =
+            (fderiv ℝ u (p.1, p.2)) (Pi.single i 1, 0) := by
+        intro p
+        change fderiv ℝ (fun y => u (y, p.2)) p.1 (Pi.single i 1) =
+               (fderiv ℝ u (p.1, p.2)) (Pi.single i 1, 0)
+        exact fderiv_partial_fst hu_diff p.1 p.2 (Pi.single i 1)
+      have : Continuous fun p : (Fin (n + 1) → ℝ) × ℝ =>
+          (fderiv ℝ u (p.1, p.2)) (Pi.single i 1, 0) := by
+        exact hu_fderiv_cont.comp (Continuous.prodMk continuous_id continuous_const)
+      simpa [hrw] using this
     have hF_cont : Continuous (fun p : (Fin (n + 1) → ℝ) × ℝ =>
         φ p.1 * boxEnergyDensity ε W u p.1 p.2) := by
-      sorry -- BLOCKER (mechanical): joint continuity from Continuous u/W/φ
-            -- and `Continuous (fderiv ℝ u)` via Pi-coordinate continuity.
+      unfold boxEnergyDensity
+      have h1 : Continuous fun p : (Fin (n + 1) → ℝ) × ℝ =>
+          ε * (∑ i, gradient_box (fun y => u (y, p.2)) p.1 i ^ 2) / 2 := by
+        have hsum : Continuous fun p : (Fin (n + 1) → ℝ) × ℝ =>
+            ∑ i, gradient_box (fun y => u (y, p.2)) p.1 i ^ 2 :=
+          continuous_finset_sum _ (fun i _ => (hgrad_cont i).pow 2)
+        continuity
+      have h2 : Continuous fun p : (Fin (n + 1) → ℝ) × ℝ =>
+          W (u (p.1, p.2)) / ε := by
+        have : Continuous fun p : (Fin (n + 1) → ℝ) × ℝ => u (p.1, p.2) :=
+          hu_cont.comp (Continuous.prodMk continuous_fst continuous_snd)
+        exact (hW_cont.comp this).div_const ε
+      exact (hφ_cont.comp continuous_fst).mul (h1.add h2)
+    -- timeDeriv joint continuity from fderiv_partial_snd.
+    have htime_cont : Continuous fun p : (Fin (n + 1) → ℝ) × ℝ =>
+        timeDeriv u p.1 p.2 := by
+      have hrw : ∀ p : (Fin (n + 1) → ℝ) × ℝ,
+          timeDeriv u p.1 p.2 = (fderiv ℝ u (p.1, p.2)) (0, 1) := by
+        intro p
+        change fderiv ℝ (fun s => u (p.1, s)) p.2 1 = (fderiv ℝ u (p.1, p.2)) (0, 1)
+        exact fderiv_partial_snd hu_diff p.1 p.2 1
+      have : Continuous fun p : (Fin (n + 1) → ℝ) × ℝ =>
+          (fderiv ℝ u (p.1, p.2)) (0, 1) := by
+        exact hu_fderiv_cont.comp (Continuous.prodMk continuous_id continuous_const)
+      simpa [hrw] using this
+    -- Joint continuity of `gradient_box (fun y => timeDeriv u y t) x i`.
+    -- By `fderiv_partial_fst` applied to `timeDeriv u`: requires Differentiable
+    -- of timeDeriv. timeDeriv = (fderiv u (·, ·)) (0, 1) — itself C¹ since
+    -- u ∈ C².
+    -- timeDeriv u q.1 q.2 = (fderiv u q) (0, 1) via fderiv_partial_snd.
+    have htimeDeriv_eq : (fun p : (Fin (n + 1) → ℝ) × ℝ => timeDeriv u p.1 p.2) =
+        fun p => (fderiv ℝ u (p.1, p.2)) (0, 1) := by
+      funext p
+      change fderiv ℝ (fun s => u (p.1, s)) p.2 1 = (fderiv ℝ u (p.1, p.2)) (0, 1)
+      exact fderiv_partial_snd hu_diff p.1 p.2 1
+    -- The function fun p => fderiv u (p.1, p.2) is C¹ from ContDiff 2 of u.
+    have hu_fderiv_C1 : ContDiff ℝ 1 (fun p : (Fin (n + 1) → ℝ) × ℝ => fderiv ℝ u p) :=
+      ContDiff.fderiv_right (m := 1) (n := 2) hu2 (by norm_num)
+    have hu_fderiv_at_C1 : ContDiff ℝ 1
+        (fun p : (Fin (n + 1) → ℝ) × ℝ => (fderiv ℝ u p) (0, 1)) :=
+      hu_fderiv_C1.clm_apply contDiff_const
+    have htimeDeriv_C1 :
+        ContDiff ℝ 1 (fun p : (Fin (n + 1) → ℝ) × ℝ => timeDeriv u p.1 p.2) := by
+      have h := hu_fderiv_at_C1
+      -- (fun p => fderiv ℝ u p (0,1)) = (fun p => fderiv ℝ u (p.1, p.2) (0,1)) up to ext.
+      convert h using 1
+    have htimeDeriv_diff :
+        Differentiable ℝ (fun p : (Fin (n + 1) → ℝ) × ℝ => timeDeriv u p.1 p.2) :=
+      htimeDeriv_C1.differentiable (by norm_num : (1 : WithTop ℕ∞) ≠ 0)
+    -- Joint continuity of `gradient_box (fun y => timeDeriv u y t) x i`.
+    have htimeDeriv_fderiv_cont :
+        Continuous fun p : ((Fin (n+1) → ℝ) × ℝ) × ((Fin (n+1) → ℝ) × ℝ) =>
+          (fderiv ℝ (fun q : (Fin (n+1) → ℝ) × ℝ => timeDeriv u q.1 q.2) p.1) p.2 :=
+      ContDiff.continuous_fderiv_apply htimeDeriv_C1
+        (by norm_num : (1 : WithTop ℕ∞) ≠ 0)
+    have hgrad_time_cont : ∀ i : Fin (n + 1), Continuous fun p : (Fin (n + 1) → ℝ) × ℝ =>
+        gradient_box (fun y => timeDeriv u y p.2) p.1 i := by
+      intro i
+      have hrw : ∀ p : (Fin (n + 1) → ℝ) × ℝ,
+          gradient_box (fun y => timeDeriv u y p.2) p.1 i =
+            (fderiv ℝ (fun q : (Fin (n+1) → ℝ) × ℝ => timeDeriv u q.1 q.2) (p.1, p.2))
+              (Pi.single i 1, 0) := by
+        intro p
+        change fderiv ℝ (fun y => timeDeriv u y p.2) p.1 (Pi.single i 1) =
+               (fderiv ℝ (fun q : (Fin (n+1) → ℝ) × ℝ => timeDeriv u q.1 q.2) (p.1, p.2))
+                 (Pi.single i 1, 0)
+        exact fderiv_partial_fst htimeDeriv_diff p.1 p.2 (Pi.single i 1)
+      have : Continuous fun p : (Fin (n + 1) → ℝ) × ℝ =>
+          (fderiv ℝ (fun q : (Fin (n+1) → ℝ) × ℝ => timeDeriv u q.1 q.2) (p.1, p.2))
+            (Pi.single i 1, 0) := by
+        exact htimeDeriv_fderiv_cont.comp (Continuous.prodMk continuous_id continuous_const)
+      simpa [hrw] using this
     have hD'_cont : Continuous (fun p : (Fin (n + 1) → ℝ) × ℝ =>
         φ p.1 * boxEnergyDensity_timeDeriv ε W u p.1 p.2) := by
-      sorry -- BLOCKER (mechanical): same reasoning — joint continuity of
-            -- gradient_box, timeDeriv, fderiv W, and products thereof.
+      unfold boxEnergyDensity_timeDeriv
+      have h1 : Continuous fun p : (Fin (n + 1) → ℝ) × ℝ =>
+          ε * (∑ i, gradient_box (fun y => u (y, p.2)) p.1 i *
+                gradient_box (fun y => timeDeriv u y p.2) p.1 i) := by
+        have hsum : Continuous fun p : (Fin (n + 1) → ℝ) × ℝ =>
+            ∑ i, gradient_box (fun y => u (y, p.2)) p.1 i *
+                  gradient_box (fun y => timeDeriv u y p.2) p.1 i :=
+          continuous_finset_sum _ (fun i _ => (hgrad_cont i).mul (hgrad_time_cont i))
+        exact hsum.const_mul ε
+      have hu_at : Continuous fun p : (Fin (n + 1) → ℝ) × ℝ => u (p.1, p.2) :=
+        hu_cont.comp (Continuous.prodMk continuous_fst continuous_snd)
+      have hW_fderiv_cont : Continuous (fderiv ℝ W) :=
+        hW2.continuous_fderiv (by norm_num : (2 : WithTop ℕ∞) ≠ 0)
+      have hW'u : Continuous fun p : (Fin (n + 1) → ℝ) × ℝ =>
+          fderiv ℝ W (u (p.1, p.2)) 1 := by
+        have happly : Continuous fun w : ℝ →L[ℝ] ℝ => w 1 := by
+          exact (ContinuousLinearMap.apply ℝ ℝ 1).continuous
+        exact happly.comp (hW_fderiv_cont.comp hu_at)
+      have h2 : Continuous fun p : (Fin (n + 1) → ℝ) × ℝ =>
+          fderiv ℝ W (u (p.1, p.2)) 1 * timeDeriv u p.1 p.2 / ε := by
+        exact ((hW'u.mul htime_cont).div_const ε)
+      exact (hφ_cont.comp continuous_fst).mul (h1.add h2)
     have h := localizedEnergy_hasDerivAt_t (a := a) (b := b) (ε := ε) (W := W) (u := u)
       φ t 1 zero_lt_one h_pt hF_cont hD'_cont
     -- The conclusion of `localizedEnergy_hasDerivAt_t` uses `boxEnergyDensity`
