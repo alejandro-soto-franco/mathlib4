@@ -2208,6 +2208,7 @@ public import Mathlib.Analysis.PhaseField.AllenCahn.Discrepancy
 public import Mathlib.Analysis.PhaseField.AllenCahn.EnergyMeasure
 public import Mathlib.Analysis.PhaseField.AllenCahn.SemiDecreasing
 public import Mathlib.Analysis.PhaseField.IntegrationByParts
+public import Mathlib.Analysis.PhaseField.IntegrationByParts.Box
 public import Mathlib.Analysis.PSeries
 public import Mathlib.Analysis.PSeriesComplex
 public import Mathlib.Analysis.Polynomial.Basic
