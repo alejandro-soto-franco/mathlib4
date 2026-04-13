@@ -502,6 +502,18 @@ theorem boxTotalEnergy_antitone (h : IsBoxSolution a b ε W σ u) :
   intro t₁ ht₁ t₂ ht₂ ht
   exact h.totalEnergy_decay t₁ t₂ ht₁ ht
 
+/-- Total energy stays bounded by its initial value for all non-negative
+time. Direct application of the antitone property. -/
+theorem boxTotalEnergy_le_initial (h : IsBoxSolution a b ε W σ u)
+    {t : ℝ} (ht : 0 ≤ t) : h.boxTotalEnergy t ≤ h.boxTotalEnergy 0 :=
+  h.boxTotalEnergy_antitone Set.self_mem_Ici (Set.mem_Ici.mpr ht) ht
+
+/-- Total energy is bounded by any initial-energy upper bound `E₀`. -/
+theorem boxTotalEnergy_le_of_initial_bound (h : IsBoxSolution a b ε W σ u)
+    {E₀ : ℝ} (hE₀ : h.boxTotalEnergy 0 ≤ E₀) {t : ℝ} (ht : 0 ≤ t) :
+    h.boxTotalEnergy t ≤ E₀ :=
+  (h.boxTotalEnergy_le_initial ht).trans hE₀
+
 /-- **Localized dissipation inequality on a box, integrated form** — paper
 Lemma 1 of [MSTW24].
 

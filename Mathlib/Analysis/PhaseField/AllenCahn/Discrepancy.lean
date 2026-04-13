@@ -20,6 +20,9 @@ This is the quantity whose vanishing in the `ε → 0` limit (assumption (A5) of
 ## Main definitions
 
 * `MeasureTheory.AllenCahn.discrepancy` : `ξ^ε(u)(x)`.
+* `MeasureTheory.AllenCahn.discrepancyMeasure` : `ξ^ε(u)` as a Radon
+  measure on `Ω ⊆ ℝⁿ`, obtained by `Measure.withDensity` against the
+  ambient Lebesgue measure restricted to `Ω`.
 
 ## Main results
 
@@ -69,5 +72,16 @@ theorem gradient_term_eq_average
       (interiorEnergyDensity ε W u x + discrepancy ε W u x) / 2 := by
   unfold interiorEnergyDensity discrepancy
   ring
+
+variable [MeasurableSpace (EuclideanSpace ℝ (Fin n))]
+
+/-- The discrepancy as a Radon measure `ξ^ε_t · dL^n ⌞ Ω` on
+`EuclideanSpace ℝ (Fin n)`. Encoded via `Measure.withDensity` against the
+restriction of a chosen ambient (Lebesgue) measure to `Ω`. -/
+noncomputable def discrepancyMeasure
+    (μ : Measure (EuclideanSpace ℝ (Fin n)))
+    (Ω : Set (EuclideanSpace ℝ (Fin n))) (ε : ℝ) (W : ℝ → ℝ)
+    (u : EuclideanSpace ℝ (Fin n) → ℝ) : Measure (EuclideanSpace ℝ (Fin n)) :=
+  (μ.restrict Ω).withDensity (fun x => ENNReal.ofReal (discrepancy ε W u x))
 
 end MeasureTheory.AllenCahn
