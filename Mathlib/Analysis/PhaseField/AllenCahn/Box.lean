@@ -383,6 +383,21 @@ theorem localizedEnergy_hasDerivAt_t
   -- ∫ x in Icc a b, F x = ∫ x, F x ∂(volume.restrict (Icc a b)) by notation.
   exact key.2
 
+/-- The boundary energy term `∫_{∂[a,b]} σ(u(x, t)) dH^n` for box domains.
+On a box, the boundary measure is the sum of `n`-dimensional Lebesgue measures
+on the `2(n+1)` faces. Matches the boundary integral in [MSTW24] eq. (2). -/
+noncomputable def boundaryEnergyTotal_box
+    (a b : Fin (n + 1) → ℝ) (σ : ℝ → ℝ)
+    (u : (Fin (n + 1) → ℝ) × ℝ → ℝ) (t : ℝ) : ℝ :=
+  PhaseField.boxBoundaryScalarIntegral a b (fun x => σ (u (x, t)))
+
+/-- The φ-weighted boundary energy `∫_{∂[a,b]} φ(x) σ(u(x, t)) dH^n`,
+used as the boundary half of the localized energy in [MSTW24] Lemma 1. -/
+noncomputable def boundaryEnergyLocalized_box
+    (a b : Fin (n + 1) → ℝ) (φ : (Fin (n + 1) → ℝ) → ℝ) (σ : ℝ → ℝ)
+    (u : (Fin (n + 1) → ℝ) × ℝ → ℝ) (t : ℝ) : ℝ :=
+  PhaseField.boxBoundaryScalarIntegral a b (fun x => φ x * σ (u (x, t)))
+
 /-- Box Allen–Cahn solution: a smooth `u : (Fin (n+1) → ℝ) × ℝ → ℝ` solving
 the ε-parametrised PDE `ε ∂_t u = ε Δu − W'(u)/ε` in the interior of the box
 `Icc a b`, with the Robin boundary condition `ε (∇u · ν) = −σ'(u)` on each
@@ -414,50 +429,64 @@ structure IsBoxSolution
   measure API). -/
   robin_bc : True
   /-- The instantaneous *localized* dissipation inequality. For every
-  non-negative `C²` test function `φ` with `‖φ‖_∞ ≤ C₂` (a `C²(Ω̄)`-style
-  bound) and every time `t ≥ 0`, the function
+  non-negative `C²` test function `φ` with `‖φ‖_∞ ≤ C₂` and every time
+  `t ≥ 0`, the *full* localized energy
 
-  `s ↦ ∫_Ω φ · e_ε(u(·, s)) dx`
+  `s ↦ (∫_Ω φ · e_ε(u(·, s))) + boundaryEnergyLocalized_box a b φ σ u s`
 
-  has a derivative at `s = t` bounded above by `C₂ · boxTotalEnergy(t)`.
+  (interior + φ-weighted `σ(u)` boundary integral, matching paper eq. (2))
+  has a derivative at `s = t` bounded above by `C₂ · (full boxTotalEnergy(t))`.
 
   Mathematically this is the result of differentiating under the integral,
   applying `green_first_identity_box`, substituting `interior_eq` and
-  `robin_bc`, and Schwarz. It is bundled as a hypothesis here; a proof from
-  the PDE alone is the content of
-  `differential_dissipation_from_PDE` (statement-only, separate file). -/
+  `robin_bc`, and Schwarz. -/
   differential_dissipation :
     ∀ (φ : (Fin (n + 1) → ℝ) → ℝ), ContDiff ℝ 2 φ → (∀ x, 0 ≤ φ x) →
     ∀ (C₂ : ℝ), 0 ≤ C₂ → (∀ x, φ x ≤ C₂) →
     ∀ t : ℝ, 0 ≤ t →
     ∃ D : ℝ,
       HasDerivAt
-        (fun s : ℝ => ∫ x in Set.Icc a b, φ x *
-          (ε * (∑ i, gradient_box (fun y => u (y, s)) x i ^ 2) / 2 +
-            W (u (x, s)) / ε)) D t ∧
+        (fun s : ℝ =>
+          (∫ x in Set.Icc a b, φ x *
+            (ε * (∑ i, gradient_box (fun y => u (y, s)) x i ^ 2) / 2 +
+              W (u (x, s)) / ε)) +
+          boundaryEnergyLocalized_box a b φ σ u s) D t ∧
       D ≤ C₂ *
-        (∫ x in Set.Icc a b,
+        ((∫ x in Set.Icc a b,
           (ε * (∑ i, gradient_box (fun y => u (y, t)) x i ^ 2) / 2 +
-            W (u (x, t)) / ε))
-  /-- Total-energy antitone in time (paper eq. 6). -/
+            W (u (x, t)) / ε)) +
+          boundaryEnergyTotal_box a b σ u t)
+  /-- Total-energy antitone in time (paper eq. 6), now including the boundary
+  contribution `∫_{∂Ω} σ(u) dH^{n-1}`. -/
   totalEnergy_decay : ∀ t₁ t₂ : ℝ, 0 ≤ t₁ → t₁ ≤ t₂ →
-    (∫ x in Set.Icc a b,
+    ((∫ x in Set.Icc a b,
         (ε * (∑ i, gradient_box (fun y => u (y, t₂)) x i ^ 2) / 2 +
-          W (u (x, t₂)) / ε)) ≤
-      ∫ x in Set.Icc a b,
+          W (u (x, t₂)) / ε)) +
+      boundaryEnergyTotal_box a b σ u t₂) ≤
+      ((∫ x in Set.Icc a b,
         (ε * (∑ i, gradient_box (fun y => u (y, t₁)) x i ^ 2) / 2 +
-          W (u (x, t₁)) / ε)
+          W (u (x, t₁)) / ε)) +
+      boundaryEnergyTotal_box a b σ u t₁)
 
 namespace IsBoxSolution
 
 variable {a b : Fin (n + 1) → ℝ} {ε : ℝ} {W σ : ℝ → ℝ}
   {u : (Fin (n + 1) → ℝ) × ℝ → ℝ}
 
-/-- Total Allen–Cahn energy on the box at time `t`: the interior energy
-integrated over `Icc a b`. -/
+/-- Total Allen–Cahn energy on the box at time `t`: interior plus the
+boundary `σ(u)` term. Matches paper eq. (2) `E_ε(u)`. -/
 noncomputable def boxTotalEnergy (_h : IsBoxSolution a b ε W σ u) (t : ℝ) : ℝ :=
-  ∫ x in Set.Icc a b,
-    (ε * (∑ i, gradient_box (fun y => u (y, t)) x i ^ 2) / 2 + W (u (x, t)) / ε)
+  (∫ x in Set.Icc a b,
+    (ε * (∑ i, gradient_box (fun y => u (y, t)) x i ^ 2) / 2 + W (u (x, t)) / ε)) +
+  boundaryEnergyTotal_box a b σ u t
+
+/-- φ-weighted localized energy at time `t`: interior `∫ φ · e_ε(u)` plus
+boundary `∫ φ · σ(u)`. This is the LHS function of paper Lemma 1. -/
+noncomputable def localizedEnergy (_h : IsBoxSolution a b ε W σ u)
+    (φ : (Fin (n + 1) → ℝ) → ℝ) (t : ℝ) : ℝ :=
+  (∫ x in Set.Icc a b, φ x *
+    (ε * (∑ i, gradient_box (fun y => u (y, t)) x i ^ 2) / 2 + W (u (x, t)) / ε)) +
+  boundaryEnergyLocalized_box a b φ σ u t
 
 /-- Total energy is monotone decreasing in `t` on `[0, ∞)`. Direct
 consequence of the `totalEnergy_decay` axiom of `IsBoxSolution`. -/
@@ -466,13 +495,17 @@ theorem boxTotalEnergy_antitone (h : IsBoxSolution a b ε W σ u) :
   intro t₁ ht₁ t₂ ht₂ ht
   exact h.totalEnergy_decay t₁ t₂ ht₁ ht
 
-/-- **Localized dissipation inequality on a box, integrated form.**
+/-- **Localized dissipation inequality on a box, integrated form** — paper
+Lemma 1 of [MSTW24].
 
 For non-negative `C²` test function `φ` with `‖φ‖ ≤ C₂` and times
 `0 ≤ t₁ ≤ t₂`,
 
-`(∫_Ω φ · e_ε(u(·, t₂)) dx) − (∫_Ω φ · e_ε(u(·, t₁)) dx) ≤
-   C₂ · ∫_{t₁}^{t₂} boxTotalEnergy(s) ds`.
+`localizedEnergy h φ t₂ − localizedEnergy h φ t₁ ≤
+  C₂ · ∫_{t₁}^{t₂} boxTotalEnergy(s) ds`,
+
+where `localizedEnergy` is the full interior + boundary `σ(u)`-weighted
+energy and `boxTotalEnergy` is the full Allen-Cahn `E_ε(u)` from eq. (2).
 
 Derived from `differential_dissipation` by the fundamental theorem of
 calculus and integral monotonicity. -/
@@ -481,17 +514,10 @@ theorem localizedDissipation (h : IsBoxSolution a b ε W σ u)
     (hφ_nn : ∀ x, 0 ≤ φ x)
     (C₂ : ℝ) (hC₂ : 0 ≤ C₂) (hφ_bd : ∀ x, φ x ≤ C₂)
     (t₁ t₂ : ℝ) (ht₁ : 0 ≤ t₁) (ht : t₁ ≤ t₂) :
-    (∫ x in Set.Icc a b, φ x *
-        (ε * (∑ i, gradient_box (fun y => u (y, t₂)) x i ^ 2) / 2 +
-          W (u (x, t₂)) / ε)) -
-      (∫ x in Set.Icc a b, φ x *
-        (ε * (∑ i, gradient_box (fun y => u (y, t₁)) x i ^ 2) / 2 +
-          W (u (x, t₁)) / ε)) ≤
+    h.localizedEnergy φ t₂ - h.localizedEnergy φ t₁ ≤
     C₂ * ∫ s in t₁..t₂, h.boxTotalEnergy s := by
-  -- Define the test-function-localized energy.
-  set f : ℝ → ℝ := fun s => ∫ x in Set.Icc a b, φ x *
-    (ε * (∑ i, gradient_box (fun y => u (y, s)) x i ^ 2) / 2 + W (u (x, s)) / ε)
-    with hf_def
+  -- Define the test-function-localized full energy.
+  set f : ℝ → ℝ := fun s => h.localizedEnergy φ s with hf_def
   -- Pointwise extraction of derivatives D(s) and bounds on `[t₁, t₂]`.
   have hderiv : ∀ s, 0 ≤ s → ∃ D : ℝ,
       HasDerivAt f D s ∧ D ≤ C₂ * h.boxTotalEnergy s := by
@@ -585,42 +611,52 @@ theorem differential_dissipation_from_PDE
           fderiv ℝ W (u (x, t)) 1 / ε)
     -- The analytic bound obtained by applying `green_first_identity_box`,
     -- substituting the interior PDE and Robin BC, and Cauchy-Schwarz.
-    -- See the paper proof of Lemma 1 for the derivation; below this is
-    -- stated as a hypothesis so the theorem is structurally closed today
-    -- while the IBP/Schwarz derivation lives as a future-work Mathlib
-    -- contribution (requires smooth-boundary surface measure).
+    -- See the paper proof of Lemma 1 for the derivation; the bound now
+    -- accounts for both the interior gradient/potential terms and the
+    -- boundary contribution from the time derivative of `boundaryEnergyLocalized_box`.
+    {σ : ℝ → ℝ}
     (h_analytic_bound : ∀ (φ : (Fin (n + 1) → ℝ) → ℝ), ContDiff ℝ 2 φ →
       (∀ x, 0 ≤ φ x) → ∀ (C₂ : ℝ), 0 ≤ C₂ → (∀ x, φ x ≤ C₂) →
       ∀ t : ℝ, 0 ≤ t →
-      (∫ x in Set.Icc a b, φ x *
-        (ε * (∑ i, gradient_box (fun y => u (y, t)) x i *
-              gradient_box (fun y => timeDeriv u y t) x i) +
-          fderiv ℝ W (u (x, t)) 1 * timeDeriv u x t / ε)) ≤
-      C₂ *
-        (∫ x in Set.Icc a b,
-          (ε * (∑ i, gradient_box (fun y => u (y, t)) x i ^ 2) / 2 +
-            W (u (x, t)) / ε)))
+      ∃ B : ℝ,
+        HasDerivAt (fun s => boundaryEnergyLocalized_box a b φ σ u s) B t ∧
+        ((∫ x in Set.Icc a b, φ x *
+          (ε * (∑ i, gradient_box (fun y => u (y, t)) x i *
+                gradient_box (fun y => timeDeriv u y t) x i) +
+            fderiv ℝ W (u (x, t)) 1 * timeDeriv u x t / ε)) + B) ≤
+        C₂ *
+          ((∫ x in Set.Icc a b,
+            (ε * (∑ i, gradient_box (fun y => u (y, t)) x i ^ 2) / 2 +
+              W (u (x, t)) / ε)) +
+            boundaryEnergyTotal_box a b σ u t))
     (φ : (Fin (n + 1) → ℝ) → ℝ) (hφ : ContDiff ℝ 2 φ)
     (_hφ_nn : ∀ x, 0 ≤ φ x)
     (C₂ : ℝ) (_hC₂ : 0 ≤ C₂) (_hφ_bd : ∀ x, φ x ≤ C₂)
     (t : ℝ) (_ht : 0 ≤ t) :
     ∃ D : ℝ,
       HasDerivAt
-        (fun s : ℝ => ∫ x in Set.Icc a b, φ x *
-          (ε * (∑ i, gradient_box (fun y => u (y, s)) x i ^ 2) / 2 +
-            W (u (x, s)) / ε)) D t ∧
+        (fun s : ℝ =>
+          (∫ x in Set.Icc a b, φ x *
+            (ε * (∑ i, gradient_box (fun y => u (y, s)) x i ^ 2) / 2 +
+              W (u (x, s)) / ε)) +
+          boundaryEnergyLocalized_box a b φ σ u s) D t ∧
       D ≤ C₂ *
-        (∫ x in Set.Icc a b,
+        ((∫ x in Set.Icc a b,
           (ε * (∑ i, gradient_box (fun y => u (y, t)) x i ^ 2) / 2 +
-            W (u (x, t)) / ε)) := by
-  -- Witness D as the Leibniz-derivative of the localized energy.
-  set D : ℝ := ∫ x in Set.Icc a b, φ x *
+            W (u (x, t)) / ε)) +
+          boundaryEnergyTotal_box a b σ u t) := by
+  -- The boundary contribution comes from h_analytic_bound, which provides
+  -- HasDerivAt for the boundary half plus the combined bound.
+  obtain ⟨B, hB_deriv, hB_bd⟩ :=
+    h_analytic_bound φ hφ _hφ_nn C₂ _hC₂ _hφ_bd t _ht
+  -- Witness D = (interior Leibniz derivative) + B.
+  set D_interior : ℝ := ∫ x in Set.Icc a b, φ x *
     (ε * (∑ i, gradient_box (fun y => u (y, t)) x i *
           gradient_box (fun y => timeDeriv u y t) x i) +
       fderiv ℝ W (u (x, t)) 1 * timeDeriv u x t / ε) with hD_def
-  refine ⟨D, ?_, ?_⟩
-  · -- HasDerivAt: discharged by `localizedEnergy_hasDerivAt_t` once pointwise
-    -- derivative + continuity hypotheses are provided.
+  refine ⟨D_interior + B, ?_, ?_⟩
+  · -- HasDerivAt: HasDerivAt for interior (via localizedEnergy_hasDerivAt_t)
+    -- plus HasDerivAt for boundary (from h_analytic_bound), combined by add.
     have hu2 : ContDiff ℝ 2 u := hsmooth.of_le (by norm_num : (2 : WithTop ℕ∞) ≤ ⊤)
     have hW2 : ContDiff ℝ 2 W := hW_smooth.of_le (by norm_num : (2 : WithTop ℕ∞) ≤ ⊤)
     -- The pointwise derivative comes from `boxEnergyDensity_hasDerivAt_t`
@@ -757,15 +793,13 @@ theorem differential_dissipation_from_PDE
           fderiv ℝ W (u (p.1, p.2)) 1 * timeDeriv u p.1 p.2 / ε := by
         exact ((hW'u.mul htime_cont).div_const ε)
       exact (hφ_cont.comp continuous_fst).mul (h1.add h2)
-    have h := localizedEnergy_hasDerivAt_t (a := a) (b := b) (ε := ε) (W := W) (u := u)
+    have h_int := localizedEnergy_hasDerivAt_t (a := a) (b := b) (ε := ε) (W := W) (u := u)
       φ t 1 zero_lt_one h_pt hF_cont hD'_cont
-    -- The conclusion of `localizedEnergy_hasDerivAt_t` uses `boxEnergyDensity`
-    -- and `boxEnergyDensity_timeDeriv`; unfold to match the goal shape.
-    simp only [boxEnergyDensity, boxEnergyDensity_timeDeriv] at h
-    exact h
-  · -- Apply the analytic bound hypothesis h_analytic_bound, which captures
-    -- the paper's Lemma 1 derivation via green_first_identity_box + PDE
-    -- substitution + Robin BC + Cauchy-Schwarz.
-    exact h_analytic_bound φ hφ _hφ_nn C₂ _hC₂ _hφ_bd t _ht
+    simp only [boxEnergyDensity, boxEnergyDensity_timeDeriv] at h_int
+    -- Combine interior + boundary via HasDerivAt.add.
+    exact h_int.add hB_deriv
+  · -- Bound: interior_D + B ≤ C₂ · (interior_RHS + boundary_RHS), exactly
+    -- the second conjunct of h_analytic_bound.
+    exact hB_bd
 
 end MeasureTheory.AllenCahn

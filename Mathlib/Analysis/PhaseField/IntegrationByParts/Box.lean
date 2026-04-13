@@ -119,6 +119,19 @@ noncomputable def boxBoundaryFlux (a b : Fin (n + 1) → ℝ)
       ∫ x in Set.Icc (a ∘ i.succAbove) (b ∘ i.succAbove),
         X (i.insertNth (a i) x) i)
 
+/-- **Box boundary integral of a scalar function.** Sums the integral of `f`
+over the `2(n+1)` faces of `[a, b]`, each face equipped with its standard
+`n`-dimensional Lebesgue measure. Used to define the surface energy
+`∫_{∂Ω} σ(u) dH^{n-1}` for box domains, and the localized variant
+`∫_{∂Ω} φ · σ(u) dH^{n-1}`. -/
+noncomputable def boxBoundaryScalarIntegral (a b : Fin (n + 1) → ℝ)
+    (f : (Fin (n + 1) → ℝ) → ℝ) : ℝ :=
+  ∑ i : Fin (n + 1),
+    ((∫ x in Set.Icc (a ∘ i.succAbove) (b ∘ i.succAbove),
+        f (i.insertNth (b i) x)) +
+      ∫ x in Set.Icc (a ∘ i.succAbove) (b ∘ i.succAbove),
+        f (i.insertNth (a i) x))
+
 /-- **Box divergence theorem, packaged form.** Wraps `divergence_theorem_box`
 in `boxBoundaryFlux`. Fully proved. -/
 theorem divergence_theorem_box_flux {a b : Fin (n + 1) → ℝ} (hle : a ≤ b)
