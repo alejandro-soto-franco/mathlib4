@@ -2204,6 +2204,7 @@ public import Mathlib.Analysis.ODE.Gronwall
 public import Mathlib.Analysis.ODE.PicardLindelof
 public import Mathlib.Analysis.ODE.Transform
 public import Mathlib.Analysis.Oscillation
+public import Mathlib.Analysis.PhaseField.AllenCahn.Box
 public import Mathlib.Analysis.PhaseField.AllenCahn.Discrepancy
 public import Mathlib.Analysis.PhaseField.AllenCahn.EnergyMeasure
 public import Mathlib.Analysis.PhaseField.AllenCahn.SemiDecreasing
