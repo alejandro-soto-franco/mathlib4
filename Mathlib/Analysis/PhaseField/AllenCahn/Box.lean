@@ -105,20 +105,40 @@ mixed-partials identity `∂_s ∂_{x_i} u = ∂_{x_i} ∂_s u` from Schwarz on
 `u ∈ C²`. -/
 theorem boxEnergyDensity_hasDerivAt_t
     {ε : ℝ} {W : ℝ → ℝ} {u : (Fin (n + 1) → ℝ) × ℝ → ℝ}
-    (_hu : ContDiff ℝ 2 u) (_hW : ContDiff ℝ 2 W)
+    (hu : ContDiff ℝ 2 u) (hW : ContDiff ℝ 2 W)
     (x : Fin (n + 1) → ℝ) (t : ℝ) :
     HasDerivAt (fun s => boxEnergyDensity ε W u x s)
       (ε * (∑ i, gradient_box (fun y => u (y, t)) x i *
             gradient_box (fun y => timeDeriv u y t) x i) +
         fderiv ℝ W (u (x, t)) 1 * timeDeriv u x t / ε) t := by
-  -- BLOCKER: chain rule on each summand. Specifically:
-  -- · `∂_s ‖∇u(x, s)‖² = 2 ⟨∇u(x, s), ∂_s ∇u(x, s)⟩`, where `∂_s ∇u = ∇(∂_s u)`
-  --   by symmetry of mixed partials (Mathlib `ContDiff.symm` / Schwarz).
-  -- · `∂_s W(u(x, s)) = W'(u(x, s)) · ∂_s u(x, s)` (chain rule).
-  -- Mathlib has `HasDerivAt.norm_sq`, `HasDerivAt.comp` (for chain rule),
-  -- and the symmetric-second-derivative theorem
-  -- `ContDiffAt.is_symm_secondFDeriv` (or similar). Assembling them is
-  -- the work of one focused theorem.
+  unfold boxEnergyDensity
+  have hu_diff : Differentiable ℝ u :=
+    hu.differentiable (by norm_num : (2 : WithTop ℕ∞) ≠ 0)
+  -- Step 1: u_t at fixed x is differentiable in s with derivative timeDeriv u x t.
+  have h_u_at_x : HasDerivAt (fun s => u (x, s)) (timeDeriv u x t) t := by
+    -- timeDeriv u x t = fderiv ℝ (fun s' => u(x, s')) t 1, so HasDerivAt is direct.
+    have hdiff : DifferentiableAt ℝ (fun s : ℝ => u (x, s)) t := by
+      have h := hu_diff (x, t)
+      exact h.comp t (hasFDerivAt_prodMk_right x t).differentiableAt
+    -- HasDerivAt f f' t ↔ HasFDerivAt f (smulRight 1 f') t. By def of timeDeriv.
+    exact hdiff.hasDerivAt
+  -- Step 2: ∂_s u(x, s) at s = t' for s in a neighborhood. We need this for
+  -- all s' near t, so we can apply HasDerivAt.pow which only needs at point.
+  -- Step 3: gradient component s ↦ ∂_i u (x, s) has derivative ∂_t ∂_i u (x, t)
+  -- which by Schwarz equals ∂_i ∂_t u (x, t) = gradient of timeDeriv at x.
+  --
+  -- This is the Schwarz step. Specifically:
+  -- gradient_box (fun y => u(y, s)) x i = fderiv ℝ (fun y => u(y, s)) x (Pi.single i 1)
+  --                                     = fderiv ℝ u (x, s) (Pi.single i 1, 0) [partial_fst]
+  -- d/ds (fderiv ℝ u (x, s) (Pi.single i 1, 0))
+  --   = fderiv ℝ (fun s' => fderiv ℝ u (x, s') (Pi.single i 1, 0)) t 1
+  --   = ... by Schwarz, equal to gradient_box (timeDeriv u y t) x i
+  -- This step requires careful ContDiff.fderiv_right + isSymmSndFDeriv work.
+  --
+  -- BLOCKER (focused): the Schwarz mixed-partials swap step.
+  -- Has been split off into a helper `gradient_box_hasDerivAt_t` (statement
+  -- here, proof requires ContDiffAt.isSymmSndFDerivAt + product-fderiv-curry
+  -- gymnastics; ~80 LoC of careful Lean).
   sorry
 
 /-- The explicit pointwise time derivative of `boxEnergyDensity` (target of
