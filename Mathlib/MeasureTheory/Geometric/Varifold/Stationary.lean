@@ -50,12 +50,13 @@ compactly supported `C¹` vector field. -/
 def IsStationary (V : Varifold E k) : Prop :=
   ∀ X : E → E, ContDiff ℝ 1 X → HasCompactSupport X → V.firstVariation X = 0
 
-/-- The zero varifold is stationary. -/
+omit [BorelSpace E] in
+/-- The zero varifold is stationary: integrating against the zero measure
+gives zero regardless of the vector field. -/
 theorem IsStationary.of_measure_zero (V : Varifold E k) (h : V.measure = 0) :
     V.IsStationary := by
-  -- BLOCKER: `firstVariation` integrates against `V.measure = 0`;
-  -- unfolds once `firstVariation` lands.
-  sorry
+  intro X _ _
+  simp [firstVariation, h]
 
 end Varifold
 

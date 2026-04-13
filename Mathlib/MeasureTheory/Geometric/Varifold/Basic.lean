@@ -80,11 +80,12 @@ noncomputable def mass (V : Varifold E k) (Ω : Set E) : ENNReal :=
 noncomputable def support (V : Varifold E k) : Set E :=
   sorry -- BLOCKER: `(V.measure.map Prod.fst).support` once `Measure.support` is a clean API.
 
+set_option linter.unusedSectionVars false in
 /-- A varifold with zero underlying measure has zero mass on every set. -/
 @[simp]
 theorem mass_zero_of_zero (V : Varifold E k) (Ω : Set E)
     (h : V.measure = 0) : V.mass Ω = 0 := by
-  sorry -- BLOCKER: unfold `mass` and apply `Measure.zero_apply` on the rewritten measure.
+  simp [mass, h]
 
 end Varifold
 

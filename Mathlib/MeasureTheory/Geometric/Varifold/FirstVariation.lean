@@ -7,6 +7,9 @@ module
 
 public import Mathlib.MeasureTheory.Geometric.Varifold.Basic
 public import Mathlib.Analysis.Calculus.ContDiff.Basic
+public import Mathlib.Analysis.InnerProductSpace.Projection.FiniteDimensional
+public import Mathlib.LinearAlgebra.Trace
+public import Mathlib.MeasureTheory.Integral.Bochner.Basic
 
 /-!
 # First Variation of a Varifold
@@ -47,33 +50,81 @@ variable {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [FiniteDim
   [MeasurableSpace E] [BorelSpace E]
 
 /-- Tangential divergence of a `C¹` vector field `X : E → E` along a `k`-plane
-`S` at a point `x`: the trace of the orthogonal projection of `fderiv ℝ X x`
-onto `S`. -/
+`S` at a point `x`: the trace of the composition of `fderiv ℝ X x` with the
+orthogonal projection onto `S`. Equivalently `∑ᵢ ⟨DX(x) eᵢ, eᵢ⟩` for any
+orthonormal basis `{eᵢ}` of `S`. -/
 noncomputable def tangentialDivergence {k : ℕ}
-    (X : E → E) (_x : E) (_S : Plane E k) : ℝ :=
-  sorry -- BLOCKER: `LinearMap.trace ℝ S ((orthogonalProjection S).comp (fderiv ℝ X x))`;
-        -- needs the restriction of an operator to a subspace and its trace.
+    (X : E → E) (x : E) (S : Plane E k) : ℝ :=
+  LinearMap.trace ℝ E
+    ((S.1.starProjection : E →L[ℝ] E).toLinearMap ∘ₗ (fderiv ℝ X x).toLinearMap)
 
 namespace Varifold
 
 variable {k : ℕ}
 
-/-- The first variation `δV(X)` of a varifold `V` against a vector field `X`. -/
-noncomputable def firstVariation (V : Varifold E k) (X : E → E) : ℝ :=
-  sorry -- BLOCKER: `∫ (tangentialDivergence X x S) ∂V.measure`; needs
-        -- `MeasureTheory.integral` with the product space + finiteness hypothesis.
+/-- The integrand of the first variation: `(x, S) ↦ div_S X(x)`. -/
+noncomputable def firstVariationIntegrand (X : E → E) : E × Plane E k → ℝ :=
+  fun p => tangentialDivergence X p.1 p.2
 
+/-- The first variation `δV(X) = ∫ div_S X(x) dV(x, S)`. -/
+noncomputable def firstVariation (V : Varifold E k) (X : E → E) : ℝ :=
+  ∫ p, firstVariationIntegrand X p ∂V.measure
+
+/-- Integrability hypothesis bundled for reuse: the first-variation integrand
+is integrable with respect to the varifold measure. For a `C¹_c` vector field
+this follows from boundedness of `fderiv X` on its compact support and the
+finiteness of `V.measure`. -/
+def FirstVariationIntegrable (V : Varifold E k) (X : E → E) : Prop :=
+  Integrable (firstVariationIntegrand X) V.measure
+
+omit [MeasurableSpace E] [BorelSpace E] in
+/-- The first-variation integrand is additive pointwise in the vector field. -/
+theorem firstVariationIntegrand_add (X Y : E → E) (p : E × Plane E k)
+    (hX : DifferentiableAt ℝ X p.1) (hY : DifferentiableAt ℝ Y p.1) :
+    firstVariationIntegrand (X + Y) p =
+      firstVariationIntegrand X p + firstVariationIntegrand Y p := by
+  simp only [firstVariationIntegrand, tangentialDivergence]
+  rw [fderiv_add hX hY]
+  rw [ContinuousLinearMap.coe_add, LinearMap.comp_add, map_add]
+
+omit [MeasurableSpace E] [BorelSpace E] in
+/-- The first-variation integrand is homogeneous pointwise in the vector field. -/
+theorem firstVariationIntegrand_smul (c : ℝ) (X : E → E) (p : E × Plane E k)
+    (hX : DifferentiableAt ℝ X p.1) :
+    firstVariationIntegrand (fun y => c • X y) p = c * firstVariationIntegrand X p := by
+  simp only [firstVariationIntegrand, tangentialDivergence]
+  rw [show (fun y => c • X y) = c • X from rfl, fderiv_const_smul hX c]
+  rw [ContinuousLinearMap.coe_smul, LinearMap.comp_smul, map_smul, smul_eq_mul]
+
+omit [BorelSpace E] in
 /-- Additivity of the first-variation pairing in the vector-field argument. -/
 theorem firstVariation_add (V : Varifold E k) (X Y : E → E)
-    (hX : ContDiff ℝ 1 X) (hY : ContDiff ℝ 1 Y) :
+    (hIX : V.FirstVariationIntegrable X) (hIY : V.FirstVariationIntegrable Y)
+    (hX : Differentiable ℝ X) (hY : Differentiable ℝ Y) :
     V.firstVariation (X + Y) = V.firstVariation X + V.firstVariation Y := by
-  sorry -- BLOCKER: linearity of `fderiv` + linearity of integral.
+  have hpt : ∀ p : E × Plane E k,
+      firstVariationIntegrand (X + Y) p =
+        firstVariationIntegrand X p + firstVariationIntegrand Y p :=
+    fun p => firstVariationIntegrand_add X Y p (hX p.1) (hY p.1)
+  simp only [firstVariation]
+  rw [show (fun p => firstVariationIntegrand (X + Y) p) =
+        (fun p => firstVariationIntegrand X p + firstVariationIntegrand Y p)
+      from funext hpt]
+  exact integral_add hIX hIY
 
+omit [BorelSpace E] in
 /-- Homogeneity of the first-variation pairing in the vector-field argument. -/
 theorem firstVariation_smul (V : Varifold E k) (c : ℝ) (X : E → E)
-    (hX : ContDiff ℝ 1 X) :
+    (hX : Differentiable ℝ X) :
     V.firstVariation (fun x => c • X x) = c * V.firstVariation X := by
-  sorry -- BLOCKER: linearity of `fderiv` + linearity of integral.
+  have hpt : ∀ p : E × Plane E k,
+      firstVariationIntegrand (fun y => c • X y) p = c * firstVariationIntegrand X p :=
+    fun p => firstVariationIntegrand_smul c X p (hX p.1)
+  simp only [firstVariation]
+  rw [show (fun p => firstVariationIntegrand (fun y => c • X y) p) =
+        (fun p => c * firstVariationIntegrand X p)
+      from funext hpt]
+  exact integral_const_mul c _
 
 end Varifold
 
