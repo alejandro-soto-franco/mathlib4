@@ -93,6 +93,13 @@ noncomputable def energyMeasure
     (u : EuclideanSpace ℝ (Fin n) → ℝ) : Measure (EuclideanSpace ℝ (Fin n)) :=
   interiorEnergyMeasure μ Ω ε W u + boundaryEnergyMeasure Ω σ u
 
+/-- Total Allen–Cahn energy `E_ε(u) = μ^ε(Ω̄)`, as a real number. -/
+noncomputable def totalEnergy
+    (μ : Measure (EuclideanSpace ℝ (Fin n)))
+    (Ω : Set (EuclideanSpace ℝ (Fin n))) (ε : ℝ) (W σ : ℝ → ℝ)
+    (u : EuclideanSpace ℝ (Fin n) → ℝ) : ℝ :=
+  (energyMeasure μ Ω ε W σ u Set.univ).toReal
+
 set_option linter.unusedSectionVars false in
 /-- Non-negativity of the interior energy density when `W ≥ 0` and `ε > 0`. -/
 theorem interiorEnergyDensity_nonneg
