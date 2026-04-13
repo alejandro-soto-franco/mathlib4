@@ -92,7 +92,7 @@ theorem fderiv_partial_snd {u : (Fin (n + 1) → ℝ) × ℝ → ℝ}
 `x`-direction, packaged for use by Schwarz. -/
 theorem gradient_box_eq_partial {u : (Fin (n + 1) → ℝ) × ℝ → ℝ}
     (hu : Differentiable ℝ u) (x : Fin (n + 1) → ℝ) (s : ℝ) (i : Fin (n + 1)) :
-    gradient_box (fun y => u (y, s)) x i = (fderiv ℝ u (x, s)) (Pi.single i 1, 0) := by
+    gradientBox (fun y => u (y, s)) x i = (fderiv ℝ u (x, s)) (Pi.single i 1, 0) := by
   change fderiv ℝ (fun y => u (y, s)) x (Pi.single i 1) = (fderiv ℝ u (x, s)) (Pi.single i 1, 0)
   exact fderiv_partial_fst hu x s (Pi.single i 1)
 
@@ -108,7 +108,7 @@ function of `(x, t)`. -/
 noncomputable def boxEnergyDensity
     (ε : ℝ) (W : ℝ → ℝ) (u : (Fin (n + 1) → ℝ) × ℝ → ℝ)
     (x : Fin (n + 1) → ℝ) (t : ℝ) : ℝ :=
-  ε * (∑ i, gradient_box (fun y => u (y, t)) x i ^ 2) / 2 + W (u (x, t)) / ε
+  ε * (∑ i, gradientBox (fun y => u (y, t)) x i ^ 2) / 2 + W (u (x, t)) / ε
 
 /-- **Schwarz mixed-partials swap, gradient form.** For a `C²` function `u`
 on the joint product space, the time derivative of the i-th gradient
@@ -122,12 +122,12 @@ to expressions in `fderiv (fderiv ℝ u) (x, t)`, apply Schwarz
 theorem gradient_box_hasDerivAt_t
     {u : (Fin (n + 1) → ℝ) × ℝ → ℝ} (hu : ContDiff ℝ 2 u)
     (x : Fin (n + 1) → ℝ) (t : ℝ) (i : Fin (n + 1)) :
-    HasDerivAt (fun s => gradient_box (fun y => u (y, s)) x i)
-      (gradient_box (fun y => timeDeriv u y t) x i) t := by
+    HasDerivAt (fun s => gradientBox (fun y => u (y, s)) x i)
+      (gradientBox (fun y => timeDeriv u y t) x i) t := by
   have hu_diff : Differentiable ℝ u :=
     hu.differentiable (by norm_num : (2 : WithTop ℕ∞) ≠ 0)
   -- Step 1: rewrite LHS function pointwise as `fun s => fderiv u (x, s) (Pi.single i 1, 0)`.
-  have hLHS_eq : (fun s => gradient_box (fun y => u (y, s)) x i) =
+  have hLHS_eq : (fun s => gradientBox (fun y => u (y, s)) x i) =
       (fun s => (fderiv ℝ u (x, s)) (Pi.single i 1, 0)) := by
     funext s
     exact gradient_box_eq_partial hu_diff x s i
@@ -170,9 +170,9 @@ theorem gradient_box_hasDerivAt_t
     h_symm (0, 1) (Pi.single i 1, 0)
   rw [h_swap] at h_apply'
   -- Step 5: rewrite RHS to match.
-  have hRHS_eq : gradient_box (fun y => timeDeriv u y t) x i =
+  have hRHS_eq : gradientBox (fun y => timeDeriv u y t) x i =
       (fderiv ℝ (fderiv ℝ u) (x, t) (Pi.single i 1, 0)) (0, 1) := by
-    -- gradient_box g x i = fderiv g x (Pi.single i 1) where g(y) = timeDeriv u y t.
+    -- gradientBox g x i = fderiv g x (Pi.single i 1) where g(y) = timeDeriv u y t.
     -- timeDeriv u y t = fderiv u (y, t) (0, 1) [by timeDeriv_eq_partial].
     -- So g = fun y => (fderiv u (y, t)) (0, 1).
     -- d/dy g x v = (fderiv (fun y => fderiv u (y, t)) x v) (0, 1).
@@ -215,8 +215,8 @@ theorem boxEnergyDensity_hasDerivAt_t
     (hu : ContDiff ℝ 2 u) (hW : ContDiff ℝ 2 W)
     (x : Fin (n + 1) → ℝ) (t : ℝ) :
     HasDerivAt (fun s => boxEnergyDensity ε W u x s)
-      (ε * (∑ i, gradient_box (fun y => u (y, t)) x i *
-            gradient_box (fun y => timeDeriv u y t) x i) +
+      (ε * (∑ i, gradientBox (fun y => u (y, t)) x i *
+            gradientBox (fun y => timeDeriv u y t) x i) +
         fderiv ℝ W (u (x, t)) 1 * timeDeriv u x t / ε) t := by
   unfold boxEnergyDensity
   have hu_diff : Differentiable ℝ u :=
@@ -230,23 +230,23 @@ theorem boxEnergyDensity_hasDerivAt_t
       exact h.comp t (hasFDerivAt_prodMk_right x t).differentiableAt
     exact hdiff.hasDerivAt
   -- Summand 1: ε * (Σ i, (∂_i u(x, s))²) / 2.
-  -- Per-component HasDerivAt for `s ↦ (gradient_box _ x i)²`.
+  -- Per-component HasDerivAt for `s ↦ (gradientBox _ x i)²`.
   have h_sq : ∀ i : Fin (n + 1),
-      HasDerivAt (fun s => gradient_box (fun y => u (y, s)) x i ^ 2)
-        (2 * gradient_box (fun y => u (y, t)) x i *
-          gradient_box (fun y => timeDeriv u y t) x i) t := by
+      HasDerivAt (fun s => gradientBox (fun y => u (y, s)) x i ^ 2)
+        (2 * gradientBox (fun y => u (y, t)) x i *
+          gradientBox (fun y => timeDeriv u y t) x i) t := by
     intro i
     have h := (gradient_box_hasDerivAt_t hu x t i).pow 2
     simpa using h
   have h_sum : HasDerivAt
-      (fun s => ∑ i, gradient_box (fun y => u (y, s)) x i ^ 2)
-      (∑ i, 2 * gradient_box (fun y => u (y, t)) x i *
-        gradient_box (fun y => timeDeriv u y t) x i) t :=
+      (fun s => ∑ i, gradientBox (fun y => u (y, s)) x i ^ 2)
+      (∑ i, 2 * gradientBox (fun y => u (y, t)) x i *
+        gradientBox (fun y => timeDeriv u y t) x i) t :=
     HasDerivAt.fun_sum (fun i _ => h_sq i)
   have h_sum_eps : HasDerivAt
-      (fun s => ε * (∑ i, gradient_box (fun y => u (y, s)) x i ^ 2) / 2)
-      (ε * (∑ i, 2 * gradient_box (fun y => u (y, t)) x i *
-        gradient_box (fun y => timeDeriv u y t) x i) / 2) t :=
+      (fun s => ε * (∑ i, gradientBox (fun y => u (y, s)) x i ^ 2) / 2)
+      (ε * (∑ i, 2 * gradientBox (fun y => u (y, t)) x i *
+        gradientBox (fun y => timeDeriv u y t) x i) / 2) t :=
     (h_sum.const_mul ε).div_const 2
   -- Summand 2: W(u(x, s)) / ε via chain rule then div_const.
   have h_W_at : HasDerivAt W (fderiv ℝ W (u (x, t)) 1) (u (x, t)) :=
@@ -261,21 +261,21 @@ theorem boxEnergyDensity_hasDerivAt_t
   have h_total := h_sum_eps.add h_W_eps
   convert h_total using 1
   -- Algebraic equality: ε * (Σ 2 a b) / 2 = ε * (Σ a b).
-  rw [show (fun i => 2 * gradient_box (fun y => u (y, t)) x i *
-          gradient_box (fun y => timeDeriv u y t) x i) =
-      (fun i => 2 * (gradient_box (fun y => u (y, t)) x i *
-          gradient_box (fun y => timeDeriv u y t) x i))
+  rw [show (fun i => 2 * gradientBox (fun y => u (y, t)) x i *
+          gradientBox (fun y => timeDeriv u y t) x i) =
+      (fun i => 2 * (gradientBox (fun y => u (y, t)) x i *
+          gradientBox (fun y => timeDeriv u y t) x i))
     from by funext; ring]
   rw [← Finset.mul_sum]
   ring
 
 /-- The explicit pointwise time derivative of `boxEnergyDensity` (target of
 sub-sorry #1). -/
-noncomputable def boxEnergyDensity_timeDeriv
+noncomputable def boxEnergyDensityTimeDeriv
     (ε : ℝ) (W : ℝ → ℝ) (u : (Fin (n + 1) → ℝ) × ℝ → ℝ)
     (x : Fin (n + 1) → ℝ) (s : ℝ) : ℝ :=
-  ε * (∑ i, gradient_box (fun y => u (y, s)) x i *
-        gradient_box (fun y => timeDeriv u y s) x i) +
+  ε * (∑ i, gradientBox (fun y => u (y, s)) x i *
+        gradientBox (fun y => timeDeriv u y s) x i) +
     fderiv ℝ W (u (x, s)) 1 * timeDeriv u x s / ε
 
 /-- **Leibniz under the integral, applied to the box-localized energy.**
@@ -295,13 +295,13 @@ theorem localizedEnergy_hasDerivAt_t
     (t : ℝ) (δ : ℝ) (hδ : 0 < δ)
     (h_pt : ∀ x : Fin (n + 1) → ℝ, ∀ s ∈ Metric.ball t δ,
       HasDerivAt (fun s' => boxEnergyDensity ε W u x s')
-        (boxEnergyDensity_timeDeriv ε W u x s) s)
+        (boxEnergyDensityTimeDeriv ε W u x s) s)
     (hF_cont : Continuous (fun p : (Fin (n + 1) → ℝ) × ℝ =>
       φ p.1 * boxEnergyDensity ε W u p.1 p.2))
     (hD'_cont : Continuous (fun p : (Fin (n + 1) → ℝ) × ℝ =>
-      φ p.1 * boxEnergyDensity_timeDeriv ε W u p.1 p.2)) :
+      φ p.1 * boxEnergyDensityTimeDeriv ε W u p.1 p.2)) :
     HasDerivAt (fun s => ∫ x in Set.Icc a b, φ x * boxEnergyDensity ε W u x s)
-      (∫ x in Set.Icc a b, φ x * boxEnergyDensity_timeDeriv ε W u x t) t := by
+      (∫ x in Set.Icc a b, φ x * boxEnergyDensityTimeDeriv ε W u x t) t := by
   -- Setup: Mathlib Leibniz on the restricted measure `volume.restrict (Icc a b)`.
   set μ_box : MeasureTheory.Measure (Fin (n + 1) → ℝ) :=
     MeasureTheory.volume.restrict (Set.Icc a b) with hμ_def
@@ -315,7 +315,7 @@ theorem localizedEnergy_hasDerivAt_t
   set F : ℝ → (Fin (n + 1) → ℝ) → ℝ :=
     fun s x => φ x * boxEnergyDensity ε W u x s with hF_def
   set D' : ℝ → (Fin (n + 1) → ℝ) → ℝ :=
-    fun s x => φ x * boxEnergyDensity_timeDeriv ε W u x s with hD'_def
+    fun s x => φ x * boxEnergyDensityTimeDeriv ε W u x s with hD'_def
   -- Joint continuity for F and D' as functions of (s, x) ↦ value.
   have hF_jc : Continuous (fun (p : ℝ × (Fin (n + 1) → ℝ)) => F p.1 p.2) := by
     have : Continuous (fun (p : ℝ × (Fin (n + 1) → ℝ)) =>
@@ -324,7 +324,7 @@ theorem localizedEnergy_hasDerivAt_t
     simpa [hF_def, F] using this
   have hD'_jc : Continuous (fun (p : ℝ × (Fin (n + 1) → ℝ)) => D' p.1 p.2) := by
     have : Continuous (fun (p : ℝ × (Fin (n + 1) → ℝ)) =>
-        φ p.2 * boxEnergyDensity_timeDeriv ε W u p.2 p.1) := by
+        φ p.2 * boxEnergyDensityTimeDeriv ε W u p.2 p.1) := by
       exact hD'_cont.comp (continuous_swap)
     simpa [hD'_def, D'] using this
   -- The restricted closed-ball box is compact, so D' has uniform bound on it.
@@ -386,14 +386,14 @@ theorem localizedEnergy_hasDerivAt_t
 /-- The boundary energy term `∫_{∂[a,b]} σ(u(x, t)) dH^n` for box domains.
 On a box, the boundary measure is the sum of `n`-dimensional Lebesgue measures
 on the `2(n+1)` faces. Matches the boundary integral in [MSTW24] eq. (2). -/
-noncomputable def boundaryEnergyTotal_box
+noncomputable def boundaryEnergyTotalBox
     (a b : Fin (n + 1) → ℝ) (σ : ℝ → ℝ)
     (u : (Fin (n + 1) → ℝ) × ℝ → ℝ) (t : ℝ) : ℝ :=
   PhaseField.boxBoundaryScalarIntegral a b (fun x => σ (u (x, t)))
 
 /-- The φ-weighted boundary energy `∫_{∂[a,b]} φ(x) σ(u(x, t)) dH^n`,
 used as the boundary half of the localized energy in [MSTW24] Lemma 1. -/
-noncomputable def boundaryEnergyLocalized_box
+noncomputable def boundaryEnergyLocalizedBox
     (a b : Fin (n + 1) → ℝ) (φ : (Fin (n + 1) → ℝ) → ℝ) (σ : ℝ → ℝ)
     (u : (Fin (n + 1) → ℝ) × ℝ → ℝ) (t : ℝ) : ℝ :=
   PhaseField.boxBoundaryScalarIntegral a b (fun x => φ x * σ (u (x, t)))
@@ -422,7 +422,7 @@ structure IsBoxSolution
   interior_eq :
     ∀ x ∈ Set.Ioo a b, ∀ t : ℝ,
       ε * fderiv ℝ (fun s : ℝ => u (x, s)) t 1 =
-        ε * laplacian_box (fun y => u (y, t)) x -
+        ε * laplacianBox (fun y => u (y, t)) x -
           fderiv ℝ W (u (x, t)) 1 / ε
   /-- Robin boundary condition `ε (∇u · ν) = −σ'(u)` on each face of the box.
   Encoded face-by-face: on the front face `x_i = b i` the outward normal is
@@ -430,16 +430,16 @@ structure IsBoxSolution
   normal is `-e_i`, so `(∇u · ν) = -∂_{x_i} u`. -/
   robin_bc : ∀ (i : Fin (n + 1)) (t : ℝ),
     (∀ y ∈ Set.Icc (a ∘ i.succAbove) (b ∘ i.succAbove),
-      ε * gradient_box (fun z => u (z, t)) (i.insertNth (b i) y) i =
+      ε * gradientBox (fun z => u (z, t)) (i.insertNth (b i) y) i =
         -(fderiv ℝ σ (u (i.insertNth (b i) y, t)) 1)) ∧
     (∀ y ∈ Set.Icc (a ∘ i.succAbove) (b ∘ i.succAbove),
-      -(ε * gradient_box (fun z => u (z, t)) (i.insertNth (a i) y) i) =
+      -(ε * gradientBox (fun z => u (z, t)) (i.insertNth (a i) y) i) =
         -(fderiv ℝ σ (u (i.insertNth (a i) y, t)) 1))
   /-- The instantaneous *localized* dissipation inequality. For every
   non-negative `C²` test function `φ` with `‖φ‖_∞ ≤ C₂` and every time
   `t ≥ 0`, the *full* localized energy
 
-  `s ↦ (∫_Ω φ · e_ε(u(·, s))) + boundaryEnergyLocalized_box a b φ σ u s`
+  `s ↦ (∫_Ω φ · e_ε(u(·, s))) + boundaryEnergyLocalizedBox a b φ σ u s`
 
   (interior + φ-weighted `σ(u)` boundary integral, matching paper eq. (2))
   has a derivative at `s = t` bounded above by `C₂ · (full boxTotalEnergy(t))`.
@@ -455,25 +455,25 @@ structure IsBoxSolution
       HasDerivAt
         (fun s : ℝ =>
           (∫ x in Set.Icc a b, φ x *
-            (ε * (∑ i, gradient_box (fun y => u (y, s)) x i ^ 2) / 2 +
+            (ε * (∑ i, gradientBox (fun y => u (y, s)) x i ^ 2) / 2 +
               W (u (x, s)) / ε)) +
-          boundaryEnergyLocalized_box a b φ σ u s) D t ∧
+          boundaryEnergyLocalizedBox a b φ σ u s) D t ∧
       D ≤ C₂ *
         ((∫ x in Set.Icc a b,
-          (ε * (∑ i, gradient_box (fun y => u (y, t)) x i ^ 2) / 2 +
+          (ε * (∑ i, gradientBox (fun y => u (y, t)) x i ^ 2) / 2 +
             W (u (x, t)) / ε)) +
-          boundaryEnergyTotal_box a b σ u t)
+          boundaryEnergyTotalBox a b σ u t)
   /-- Total-energy antitone in time (paper eq. 6), now including the boundary
   contribution `∫_{∂Ω} σ(u) dH^{n-1}`. -/
   totalEnergy_decay : ∀ t₁ t₂ : ℝ, 0 ≤ t₁ → t₁ ≤ t₂ →
     ((∫ x in Set.Icc a b,
-        (ε * (∑ i, gradient_box (fun y => u (y, t₂)) x i ^ 2) / 2 +
+        (ε * (∑ i, gradientBox (fun y => u (y, t₂)) x i ^ 2) / 2 +
           W (u (x, t₂)) / ε)) +
-      boundaryEnergyTotal_box a b σ u t₂) ≤
+      boundaryEnergyTotalBox a b σ u t₂) ≤
       ((∫ x in Set.Icc a b,
-        (ε * (∑ i, gradient_box (fun y => u (y, t₁)) x i ^ 2) / 2 +
+        (ε * (∑ i, gradientBox (fun y => u (y, t₁)) x i ^ 2) / 2 +
           W (u (x, t₁)) / ε)) +
-      boundaryEnergyTotal_box a b σ u t₁)
+      boundaryEnergyTotalBox a b σ u t₁)
 
 namespace IsBoxSolution
 
@@ -484,16 +484,16 @@ variable {a b : Fin (n + 1) → ℝ} {ε : ℝ} {W σ : ℝ → ℝ}
 boundary `σ(u)` term. Matches paper eq. (2) `E_ε(u)`. -/
 noncomputable def boxTotalEnergy (_h : IsBoxSolution a b ε W σ u) (t : ℝ) : ℝ :=
   (∫ x in Set.Icc a b,
-    (ε * (∑ i, gradient_box (fun y => u (y, t)) x i ^ 2) / 2 + W (u (x, t)) / ε)) +
-  boundaryEnergyTotal_box a b σ u t
+    (ε * (∑ i, gradientBox (fun y => u (y, t)) x i ^ 2) / 2 + W (u (x, t)) / ε)) +
+  boundaryEnergyTotalBox a b σ u t
 
 /-- φ-weighted localized energy at time `t`: interior `∫ φ · e_ε(u)` plus
 boundary `∫ φ · σ(u)`. This is the LHS function of paper Lemma 1. -/
 noncomputable def localizedEnergy (_h : IsBoxSolution a b ε W σ u)
     (φ : (Fin (n + 1) → ℝ) → ℝ) (t : ℝ) : ℝ :=
   (∫ x in Set.Icc a b, φ x *
-    (ε * (∑ i, gradient_box (fun y => u (y, t)) x i ^ 2) / 2 + W (u (x, t)) / ε)) +
-  boundaryEnergyLocalized_box a b φ σ u t
+    (ε * (∑ i, gradientBox (fun y => u (y, t)) x i ^ 2) / 2 + W (u (x, t)) / ε)) +
+  boundaryEnergyLocalizedBox a b φ σ u t
 
 /-- Total energy is monotone decreasing in `t` on `[0, ∞)`. Direct
 consequence of the `totalEnergy_decay` axiom of `IsBoxSolution`. -/
@@ -621,33 +621,33 @@ proof here is the next concrete deliverable. -/
 theorem differential_dissipation_from_PDE
     {a b : Fin (n + 1) → ℝ} {ε : ℝ} {W σ : ℝ → ℝ}
     {u : (Fin (n + 1) → ℝ) × ℝ → ℝ}
-    (hle : a ≤ b) (_ε_pos : 0 < ε)
+    (_hle : a ≤ b) (_ε_pos : 0 < ε)
     (hsmooth : ContDiff ℝ ⊤ u) (hW_smooth : ContDiff ℝ ⊤ W)
     (_hσ_smooth : ContDiff ℝ ⊤ σ)
     (_h_interior : ∀ x ∈ Set.Ioo a b, ∀ t : ℝ,
       ε * fderiv ℝ (fun s : ℝ => u (x, s)) t 1 =
-        ε * laplacian_box (fun y => u (y, t)) x -
+        ε * laplacianBox (fun y => u (y, t)) x -
           fderiv ℝ W (u (x, t)) 1 / ε)
     -- The analytic bound obtained by applying `green_first_identity_box`,
     -- substituting the interior PDE and Robin BC, and Cauchy-Schwarz.
     -- See the paper proof of Lemma 1 for the derivation; the bound now
     -- accounts for both the interior gradient/potential terms and the
-    -- boundary contribution from the time derivative of `boundaryEnergyLocalized_box`.
+    -- boundary contribution from the time derivative of `boundaryEnergyLocalizedBox`.
     {σ : ℝ → ℝ}
     (h_analytic_bound : ∀ (φ : (Fin (n + 1) → ℝ) → ℝ), ContDiff ℝ 2 φ →
       (∀ x, 0 ≤ φ x) → ∀ (C₂ : ℝ), 0 ≤ C₂ → (∀ x, φ x ≤ C₂) →
       ∀ t : ℝ, 0 ≤ t →
       ∃ B : ℝ,
-        HasDerivAt (fun s => boundaryEnergyLocalized_box a b φ σ u s) B t ∧
+        HasDerivAt (fun s => boundaryEnergyLocalizedBox a b φ σ u s) B t ∧
         ((∫ x in Set.Icc a b, φ x *
-          (ε * (∑ i, gradient_box (fun y => u (y, t)) x i *
-                gradient_box (fun y => timeDeriv u y t) x i) +
+          (ε * (∑ i, gradientBox (fun y => u (y, t)) x i *
+                gradientBox (fun y => timeDeriv u y t) x i) +
             fderiv ℝ W (u (x, t)) 1 * timeDeriv u x t / ε)) + B) ≤
         C₂ *
           ((∫ x in Set.Icc a b,
-            (ε * (∑ i, gradient_box (fun y => u (y, t)) x i ^ 2) / 2 +
+            (ε * (∑ i, gradientBox (fun y => u (y, t)) x i ^ 2) / 2 +
               W (u (x, t)) / ε)) +
-            boundaryEnergyTotal_box a b σ u t))
+            boundaryEnergyTotalBox a b σ u t))
     (φ : (Fin (n + 1) → ℝ) → ℝ) (hφ : ContDiff ℝ 2 φ)
     (_hφ_nn : ∀ x, 0 ≤ φ x)
     (C₂ : ℝ) (_hC₂ : 0 ≤ C₂) (_hφ_bd : ∀ x, φ x ≤ C₂)
@@ -656,22 +656,22 @@ theorem differential_dissipation_from_PDE
       HasDerivAt
         (fun s : ℝ =>
           (∫ x in Set.Icc a b, φ x *
-            (ε * (∑ i, gradient_box (fun y => u (y, s)) x i ^ 2) / 2 +
+            (ε * (∑ i, gradientBox (fun y => u (y, s)) x i ^ 2) / 2 +
               W (u (x, s)) / ε)) +
-          boundaryEnergyLocalized_box a b φ σ u s) D t ∧
+          boundaryEnergyLocalizedBox a b φ σ u s) D t ∧
       D ≤ C₂ *
         ((∫ x in Set.Icc a b,
-          (ε * (∑ i, gradient_box (fun y => u (y, t)) x i ^ 2) / 2 +
+          (ε * (∑ i, gradientBox (fun y => u (y, t)) x i ^ 2) / 2 +
             W (u (x, t)) / ε)) +
-          boundaryEnergyTotal_box a b σ u t) := by
+          boundaryEnergyTotalBox a b σ u t) := by
   -- The boundary contribution comes from h_analytic_bound, which provides
   -- HasDerivAt for the boundary half plus the combined bound.
   obtain ⟨B, hB_deriv, hB_bd⟩ :=
     h_analytic_bound φ hφ _hφ_nn C₂ _hC₂ _hφ_bd t _ht
   -- Witness D = (interior Leibniz derivative) + B.
   set D_interior : ℝ := ∫ x in Set.Icc a b, φ x *
-    (ε * (∑ i, gradient_box (fun y => u (y, t)) x i *
-          gradient_box (fun y => timeDeriv u y t) x i) +
+    (ε * (∑ i, gradientBox (fun y => u (y, t)) x i *
+          gradientBox (fun y => timeDeriv u y t) x i) +
       fderiv ℝ W (u (x, t)) 1 * timeDeriv u x t / ε) with hD_def
   refine ⟨D_interior + B, ?_, ?_⟩
   · -- HasDerivAt: HasDerivAt for interior (via localizedEnergy_hasDerivAt_t)
@@ -682,7 +682,7 @@ theorem differential_dissipation_from_PDE
     -- (sub-sorry #1).
     have h_pt : ∀ x : Fin (n + 1) → ℝ, ∀ s ∈ Metric.ball t 1,
         HasDerivAt (fun s' => boxEnergyDensity ε W u x s')
-          (boxEnergyDensity_timeDeriv ε W u x s) s := by
+          (boxEnergyDensityTimeDeriv ε W u x s) s := by
       intro x s _
       have h := boxEnergyDensity_hasDerivAt_t (ε := ε) (W := W) (u := u) hu2 hW2 x s
       convert h using 1
@@ -699,12 +699,12 @@ theorem differential_dissipation_from_PDE
     have hφ_cont : Continuous φ :=
       hφ.continuous
     have hW_cont : Continuous W := hW2.continuous
-    -- Rewrite gradient_box using fderiv_partial_fst, then continuity follows.
+    -- Rewrite gradientBox using fderiv_partial_fst, then continuity follows.
     have hgrad_cont : ∀ i : Fin (n + 1), Continuous fun p : (Fin (n + 1) → ℝ) × ℝ =>
-        gradient_box (fun y => u (y, p.2)) p.1 i := by
+        gradientBox (fun y => u (y, p.2)) p.1 i := by
       intro i
       have hrw : ∀ p : (Fin (n + 1) → ℝ) × ℝ,
-          gradient_box (fun y => u (y, p.2)) p.1 i =
+          gradientBox (fun y => u (y, p.2)) p.1 i =
             (fderiv ℝ u (p.1, p.2)) (Pi.single i 1, 0) := by
         intro p
         change fderiv ℝ (fun y => u (y, p.2)) p.1 (Pi.single i 1) =
@@ -718,9 +718,9 @@ theorem differential_dissipation_from_PDE
         φ p.1 * boxEnergyDensity ε W u p.1 p.2) := by
       unfold boxEnergyDensity
       have h1 : Continuous fun p : (Fin (n + 1) → ℝ) × ℝ =>
-          ε * (∑ i, gradient_box (fun y => u (y, p.2)) p.1 i ^ 2) / 2 := by
+          ε * (∑ i, gradientBox (fun y => u (y, p.2)) p.1 i ^ 2) / 2 := by
         have hsum : Continuous fun p : (Fin (n + 1) → ℝ) × ℝ =>
-            ∑ i, gradient_box (fun y => u (y, p.2)) p.1 i ^ 2 :=
+            ∑ i, gradientBox (fun y => u (y, p.2)) p.1 i ^ 2 :=
           continuous_finset_sum _ (fun i _ => (hgrad_cont i).pow 2)
         continuity
       have h2 : Continuous fun p : (Fin (n + 1) → ℝ) × ℝ =>
@@ -741,7 +741,7 @@ theorem differential_dissipation_from_PDE
           (fderiv ℝ u (p.1, p.2)) (0, 1) := by
         exact hu_fderiv_cont.comp (Continuous.prodMk continuous_id continuous_const)
       simpa [hrw] using this
-    -- Joint continuity of `gradient_box (fun y => timeDeriv u y t) x i`.
+    -- Joint continuity of `gradientBox (fun y => timeDeriv u y t) x i`.
     -- By `fderiv_partial_fst` applied to `timeDeriv u`: requires Differentiable
     -- of timeDeriv. timeDeriv = (fderiv u (·, ·)) (0, 1) — itself C¹ since
     -- u ∈ C².
@@ -765,17 +765,17 @@ theorem differential_dissipation_from_PDE
     have htimeDeriv_diff :
         Differentiable ℝ (fun p : (Fin (n + 1) → ℝ) × ℝ => timeDeriv u p.1 p.2) :=
       htimeDeriv_C1.differentiable (by norm_num : (1 : WithTop ℕ∞) ≠ 0)
-    -- Joint continuity of `gradient_box (fun y => timeDeriv u y t) x i`.
+    -- Joint continuity of `gradientBox (fun y => timeDeriv u y t) x i`.
     have htimeDeriv_fderiv_cont :
         Continuous fun p : ((Fin (n+1) → ℝ) × ℝ) × ((Fin (n+1) → ℝ) × ℝ) =>
           (fderiv ℝ (fun q : (Fin (n+1) → ℝ) × ℝ => timeDeriv u q.1 q.2) p.1) p.2 :=
       ContDiff.continuous_fderiv_apply htimeDeriv_C1
         (by norm_num : (1 : WithTop ℕ∞) ≠ 0)
     have hgrad_time_cont : ∀ i : Fin (n + 1), Continuous fun p : (Fin (n + 1) → ℝ) × ℝ =>
-        gradient_box (fun y => timeDeriv u y p.2) p.1 i := by
+        gradientBox (fun y => timeDeriv u y p.2) p.1 i := by
       intro i
       have hrw : ∀ p : (Fin (n + 1) → ℝ) × ℝ,
-          gradient_box (fun y => timeDeriv u y p.2) p.1 i =
+          gradientBox (fun y => timeDeriv u y p.2) p.1 i =
             (fderiv ℝ (fun q : (Fin (n+1) → ℝ) × ℝ => timeDeriv u q.1 q.2) (p.1, p.2))
               (Pi.single i 1, 0) := by
         intro p
@@ -789,14 +789,14 @@ theorem differential_dissipation_from_PDE
         exact htimeDeriv_fderiv_cont.comp (Continuous.prodMk continuous_id continuous_const)
       simpa [hrw] using this
     have hD'_cont : Continuous (fun p : (Fin (n + 1) → ℝ) × ℝ =>
-        φ p.1 * boxEnergyDensity_timeDeriv ε W u p.1 p.2) := by
-      unfold boxEnergyDensity_timeDeriv
+        φ p.1 * boxEnergyDensityTimeDeriv ε W u p.1 p.2) := by
+      unfold boxEnergyDensityTimeDeriv
       have h1 : Continuous fun p : (Fin (n + 1) → ℝ) × ℝ =>
-          ε * (∑ i, gradient_box (fun y => u (y, p.2)) p.1 i *
-                gradient_box (fun y => timeDeriv u y p.2) p.1 i) := by
+          ε * (∑ i, gradientBox (fun y => u (y, p.2)) p.1 i *
+                gradientBox (fun y => timeDeriv u y p.2) p.1 i) := by
         have hsum : Continuous fun p : (Fin (n + 1) → ℝ) × ℝ =>
-            ∑ i, gradient_box (fun y => u (y, p.2)) p.1 i *
-                  gradient_box (fun y => timeDeriv u y p.2) p.1 i :=
+            ∑ i, gradientBox (fun y => u (y, p.2)) p.1 i *
+                  gradientBox (fun y => timeDeriv u y p.2) p.1 i :=
           continuous_finset_sum _ (fun i _ => (hgrad_cont i).mul (hgrad_time_cont i))
         exact hsum.const_mul ε
       have hu_at : Continuous fun p : (Fin (n + 1) → ℝ) × ℝ => u (p.1, p.2) :=
@@ -814,7 +814,7 @@ theorem differential_dissipation_from_PDE
       exact (hφ_cont.comp continuous_fst).mul (h1.add h2)
     have h_int := localizedEnergy_hasDerivAt_t (a := a) (b := b) (ε := ε) (W := W) (u := u)
       φ t 1 zero_lt_one h_pt hF_cont hD'_cont
-    simp only [boxEnergyDensity, boxEnergyDensity_timeDeriv] at h_int
+    simp only [boxEnergyDensity, boxEnergyDensityTimeDeriv] at h_int
     -- Combine interior + boundary via HasDerivAt.add.
     exact h_int.add hB_deriv
   · -- Bound: interior_D + B ≤ C₂ · (interior_RHS + boundary_RHS), exactly
