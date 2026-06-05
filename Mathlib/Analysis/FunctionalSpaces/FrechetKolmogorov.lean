@@ -776,5 +776,23 @@ theorem totallyBounded_of_lipschitz_translation (S : Set (EucL2 n)) {R M Λ : �
     refine ⟨avg η K g, ⟨g, hg, rfl⟩, ?_⟩
     rw [dist_eq_norm]; exact happrox g hg
 
+/-! ### Passing a translation modulus to `L²` limits
+
+The translation modulus that feeds `totallyBounded_of_lipschitz_translation` is closed under `L²`
+limits. This is the bridge from `MeasureTheory.integral_sq_sub_translation_le`, which supplies the
+estimate for smooth compactly supported functions, to its consequence on the `L²` classes of Sobolev
+functions: a Sobolev function is an `L²` limit of smooth compactly supported functions whose
+gradients are uniformly bounded, and the modulus passes to the limit. Both the graph-closure `H₀¹`
+of the elliptic problem and the `W^{1,p}` structure of the Navier-Stokes development obtain their
+modulus through this lemma. -/
+theorem transL2_sub_le_of_tendsto {g : EucL2 n} {Λ : ℝ} {gk : ℕ → EucL2 n}
+    (htend : Filter.Tendsto gk Filter.atTop (nhds g))
+    (hmod : ∀ k, ∀ h, ‖transL2 h (gk k) - gk k‖ ≤ Λ * ‖h‖)
+    (h : EuclideanSpace ℝ (Fin n)) : ‖transL2 h g - g‖ ≤ Λ * ‖h‖ := by
+  have hcont : Filter.Tendsto (fun k => transL2 h (gk k) - gk k) Filter.atTop
+      (nhds (transL2 h g - g)) :=
+    (((transL2 h).continuous.tendsto g).comp htend).sub htend
+  exact le_of_tendsto hcont.norm (Filter.Eventually.of_forall (fun k => hmod k h))
+
 end MeasureTheory
 
