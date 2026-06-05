@@ -235,4 +235,50 @@ theorem stepFun_eq_on_cube {η : ℝ} (hη : 0 < η) {K : Finset (Fin n → ℤ)
       (fun hxk => absurd hx (Set.disjoint_left.mp (cube_disjoint hη hne) hxk)), mul_zero]
   · intro h; exact absurd hk₀ h
 
+/-! ### The approximation error as a sum of cube variances -/
+
+/-- On any cube the squared deviation of `g` from a constant is integrable. -/
+theorem integrableOn_cube_sq_sub (η : ℝ) (k : Fin n → ℤ) (g : EucL2 n) (c : ℝ) :
+    IntegrableOn (fun y => (g y - c) ^ 2) (cube η k) volume := by
+  haveI : IsFiniteMeasure (volume.restrict (cube η k)) :=
+    ⟨by rw [Measure.restrict_apply_univ]; exact (volume_cube_ne_top η k).lt_top⟩
+  have hg2 : MemLp (fun y => (g : EuclideanSpace ℝ (Fin n) → ℝ) y) 2
+      (volume.restrict (cube η k)) := (Lp.memLp g).restrict (cube η k)
+  have hc2 : MemLp (fun _ : EuclideanSpace ℝ (Fin n) => c) 2 (volume.restrict (cube η k)) :=
+    memLp_const c
+  exact (hg2.sub hc2).integrable_sq
+
+/-- **The approximation error decomposes as a sum of cube variances.** When `g` is supported in
+the union of the grid cubes, the squared `L²` distance from `g` to its cube-average is the sum
+over cubes of the squared deviation of `g` from its average on that cube. -/
+theorem norm_sq_sub_avg_eq {η : ℝ} (hη : 0 < η) {K : Finset (Fin n → ℤ)} {g : EucL2 n}
+    (hsupp : ∀ᵐ x ∂volume, x ∉ (⋃ k ∈ K, cube η k) → g x = 0) :
+    ‖g - avg η K g‖ ^ 2 = ∑ k ∈ K, ∫ x in cube η k, (g x - cubeCoef η k g) ^ 2 := by
+  rw [norm_sq_eq_integral_sq]
+  have hae : (fun x => ((g - avg η K g) x) ^ 2) =ᵐ[volume]
+      fun x => ∑ k ∈ K, (cube η k).indicator (fun y => (g y - cubeCoef η k g) ^ 2) x := by
+    filter_upwards [Lp.coeFn_sub g (avg η K g), coeFn_avg η K g, hsupp] with x hsub havg hsup
+    rw [hsub]; simp only [Pi.sub_apply]; rw [havg]
+    by_cases hmem : x ∈ ⋃ k ∈ K, cube η k
+    · obtain ⟨k₀, hk₀K, hk₀⟩ := Set.mem_iUnion₂.mp hmem
+      rw [stepFun_eq_on_cube hη hk₀K hk₀,
+        Finset.sum_eq_single k₀
+          (fun k _ hne => Set.indicator_of_notMem
+            (fun hxk => absurd hk₀ (Set.disjoint_left.mp (cube_disjoint hη hne) hxk)) _)
+          (fun h => absurd hk₀K h),
+        Set.indicator_of_mem hk₀]
+    · rw [hsup hmem]
+      have hstep0 : stepFun η K g x = 0 :=
+        Finset.sum_eq_zero (fun k hk => by
+          rw [Set.indicator_of_notMem (fun hxk => hmem (Set.mem_iUnion₂.mpr ⟨k, hk, hxk⟩)),
+            mul_zero])
+      have hsum0 : (∑ k ∈ K, (cube η k).indicator (fun y => (g y - cubeCoef η k g) ^ 2) x) = 0 :=
+        Finset.sum_eq_zero (fun k hk => Set.indicator_of_notMem
+          (fun hxk => hmem (Set.mem_iUnion₂.mpr ⟨k, hk, hxk⟩)) _)
+      rw [hstep0, hsum0]; norm_num
+  rw [integral_congr_ae hae,
+    integral_finsetSum K (fun k _ => (integrable_indicator_iff (measurableSet_cube η k)).mpr
+      (integrableOn_cube_sq_sub η k g _))]
+  exact Finset.sum_congr rfl (fun k _ => integral_indicator (measurableSet_cube η k))
+
 end MeasureTheory
