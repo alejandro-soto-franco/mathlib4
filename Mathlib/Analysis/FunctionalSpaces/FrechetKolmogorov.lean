@@ -43,6 +43,26 @@ open scoped ENNReal RealInnerProductSpace
 
 noncomputable section
 
+/-- **Approximation by totally bounded sets.** If every member of `S` is approximable to arbitrary
+precision by a totally bounded set, then `S` is totally bounded. -/
+theorem totallyBounded_of_approx {X : Type*} [PseudoMetricSpace X] {S : Set X}
+    (h : ∀ ε > 0, ∃ T : Set X, TotallyBounded T ∧ ∀ s ∈ S, ∃ t ∈ T, dist s t < ε) :
+    TotallyBounded S := by
+  rw [Metric.totallyBounded_iff]
+  intro ε hε
+  obtain ⟨T, hT, hST⟩ := h (ε / 2) (by linarith)
+  rw [Metric.totallyBounded_iff] at hT
+  obtain ⟨F, hFfin, hTF⟩ := hT (ε / 2) (by linarith)
+  refine ⟨F, hFfin, fun s hs => ?_⟩
+  obtain ⟨t, htT, hst⟩ := hST s hs
+  obtain ⟨f, hfF, htf⟩ := mem_iUnion₂.mp (hTF htT)
+  rw [Metric.mem_ball] at htf
+  refine mem_iUnion₂.mpr ⟨f, hfF, ?_⟩
+  rw [Metric.mem_ball]
+  calc dist s f ≤ dist s t + dist t f := dist_triangle _ _ _
+    _ < ε / 2 + ε / 2 := by linarith
+    _ = ε := by ring
+
 namespace MeasureTheory
 
 /-! ### A finite-measure Cauchy-Schwarz bound -/
