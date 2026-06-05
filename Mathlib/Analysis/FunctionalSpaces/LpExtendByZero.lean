@@ -74,7 +74,7 @@ noncomputable def lpExtendByZero (hs : MeasurableSet s) :
     · rw [Set.indicator_of_mem hxs, Set.indicator_of_mem hxs, h4x hxs, Pi.smul_apply]
     · rw [Set.indicator_of_notMem hxs, Set.indicator_of_notMem hxs, smul_zero]
   norm_map' f := by
-    show ‖(memLp_indicator_extend hs f).toLp (s.indicator (f : α → ℝ))‖ = ‖f‖
+    change ‖(memLp_indicator_extend hs f).toLp (s.indicator (f : α → ℝ))‖ = ‖f‖
     rw [Lp.norm_toLp, eLpNorm_indicator_eq_eLpNorm_restrict hs, Lp.norm_def]
 
 @[simp] theorem coeFn_lpExtendByZero (hs : MeasurableSet s) (f : Lp ℝ p (μ.restrict s)) :

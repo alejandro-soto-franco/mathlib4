@@ -149,7 +149,8 @@ theorem norm_sq_transL2_sub (h : EuclideanSpace ℝ (Fin n)) (g : EucL2 n) :
 
 /-! ### The cube grid -/
 
-/-- The half-open cube of side `η` at lattice index `k`, as a subset of `EuclideanSpace ℝ (Fin n)`. -/
+/-- The half-open cube of side `η` at lattice index `k`, as a subset of
+`EuclideanSpace ℝ (Fin n)`. -/
 def cube (η : ℝ) (k : Fin n → ℤ) : Set (EuclideanSpace ℝ (Fin n)) :=
   WithLp.ofLp ⁻¹' Set.univ.pi (fun i => Set.Ico (η * (k i : ℝ)) (η * ((k i : ℝ) + 1)))
 
@@ -398,7 +399,8 @@ theorem integrableOn_prod_sq_sub (g : EucL2 n) {s t : Set (EuclideanSpace ℝ (F
     ((Lp.memLp g).restrict t).integrable_sq
   have hdom : Integrable (fun p : EuclideanSpace ℝ (Fin n) × EuclideanSpace ℝ (Fin n) =>
       2 * (g p.1) ^ 2 + 2 * (g p.2) ^ 2) ((volume.restrict s).prod (volume.restrict t)) :=
-    ((hg2s.comp_fst (volume.restrict t)).const_mul 2).add ((hg2t.comp_snd (volume.restrict s)).const_mul 2)
+    ((hg2s.comp_fst (volume.restrict t)).const_mul 2).add
+      ((hg2t.comp_snd (volume.restrict s)).const_mul 2)
   refine hdom.mono' hmeas ?_
   filter_upwards with p
   rw [Real.norm_eq_abs, abs_of_nonneg (by positivity)]
@@ -416,12 +418,14 @@ theorem integrable_prod_displacement (g : EucL2 n) {D : Set (EuclideanSpace ℝ 
     ⟨by rw [Measure.restrict_apply_univ]; exact hμD.lt_top⟩
   have hshear : MeasurePreserving
       (fun p : EuclideanSpace ℝ (Fin n) × EuclideanSpace ℝ (Fin n) => (p.1, p.1 + p.2))
-      (volume.prod volume) (volume.prod volume) := measurePreserving_prod_add (μ := volume) (ν := volume)
+      (volume.prod volume) (volume.prod volume) :=
+    measurePreserving_prod_add (μ := volume) (ν := volume)
   have h1 : AEStronglyMeasurable
       (fun q : EuclideanSpace ℝ (Fin n) × EuclideanSpace ℝ (Fin n) => g q.2) (volume.prod volume) :=
     (Lp.aestronglyMeasurable g).comp_snd (μ := (volume : Measure (EuclideanSpace ℝ (Fin n))))
   have hmeas_shear : Measurable
-      (fun p : EuclideanSpace ℝ (Fin n) × EuclideanSpace ℝ (Fin n) => (p.1, p.1 + p.2)) := by fun_prop
+      (fun p : EuclideanSpace ℝ (Fin n) × EuclideanSpace ℝ (Fin n) => (p.1, p.1 + p.2)) := by
+    fun_prop
   have haesm_add0 : AEStronglyMeasurable
       (fun p : EuclideanSpace ℝ (Fin n) × EuclideanSpace ℝ (Fin n) => g (p.1 + p.2))
       (volume.prod volume) := by
@@ -434,7 +438,8 @@ theorem integrable_prod_displacement (g : EucL2 n) {D : Set (EuclideanSpace ℝ 
       = (volume.prod (volume : Measure (EuclideanSpace ℝ (Fin n)))).restrict
         ((Set.univ : Set (EuclideanSpace ℝ (Fin n))) ×ˢ D) := by
     rw [← Measure.prod_restrict, Measure.restrict_univ]
-  have haesm_add : AEStronglyMeasurable (fun p => g (p.1 + p.2)) (volume.prod (volume.restrict D)) := by
+  have haesm_add : AEStronglyMeasurable (fun p => g (p.1 + p.2))
+      (volume.prod (volume.restrict D)) := by
     rw [heqμ]; exact haesm_add0.restrict
   have hmeas : AEStronglyMeasurable (fun p => (g p.1 - g (p.1 + p.2)) ^ 2)
       (volume.prod (volume.restrict D)) :=
@@ -442,8 +447,9 @@ theorem integrable_prod_displacement (g : EucL2 n) {D : Set (EuclideanSpace ℝ 
   have hI1 : Integrable (fun p : EuclideanSpace ℝ (Fin n) × EuclideanSpace ℝ (Fin n) => (g p.1) ^ 2)
       (volume.prod (volume.restrict D)) :=
     (MemLp.integrable_sq (Lp.memLp g)).comp_fst (volume.restrict D)
-  have haesm_sq : AEStronglyMeasurable (fun p : EuclideanSpace ℝ (Fin n) × EuclideanSpace ℝ (Fin n) =>
-      (g (p.1 + p.2)) ^ 2) (volume.prod (volume.restrict D)) := haesm_add.pow 2
+  have haesm_sq : AEStronglyMeasurable
+      (fun p : EuclideanSpace ℝ (Fin n) × EuclideanSpace ℝ (Fin n) => (g (p.1 + p.2)) ^ 2)
+      (volume.prod (volume.restrict D)) := haesm_add.pow 2
   have hI2 : Integrable (fun p => (g (p.1 + p.2)) ^ 2) (volume.prod (volume.restrict D)) := by
     refine (integrable_prod_iff' haesm_sq).mpr ⟨Filter.Eventually.of_forall (fun w => ?_), ?_⟩
     · simp only
@@ -476,7 +482,8 @@ theorem integrableOn_dbox_sq_sub_translate {η : ℝ} (g : EucL2 n) (x : Euclide
     IntegrableOn (fun w => (g x - g (x + w)) ^ 2) (dbox η) volume := by
   haveI : IsFiniteMeasure (volume.restrict (dbox η : Set (EuclideanSpace ℝ (Fin n)))) :=
     ⟨by rw [Measure.restrict_apply_univ]; exact (volume_dbox_ne_top (n := n) η).lt_top⟩
-  have hmp : MeasurePreserving (fun w => x + w) (volume : Measure (EuclideanSpace ℝ (Fin n))) volume :=
+  have hmp : MeasurePreserving (fun w => x + w)
+      (volume : Measure (EuclideanSpace ℝ (Fin n))) volume :=
     measurePreserving_add_left volume x
   have hemb : MeasurableEmbedding (fun w : EuclideanSpace ℝ (Fin n) => x + w) :=
     (MeasurableEquiv.addLeft x).measurableEmbedding
@@ -488,7 +495,8 @@ theorem integrableOn_dbox_sq_sub_translate {η : ℝ} (g : EucL2 n) (x : Euclide
     exact (hmap.comp_measurable (by fun_prop)).restrict
   have haesm : AEStronglyMeasurable (fun w => (g x - g (x + w)) ^ 2) (volume.restrict (dbox η)) :=
     (aestronglyMeasurable_const.sub haesm_gxw).pow 2
-  have hdom : Integrable (fun w => 2 * (g x) ^ 2 + 2 * (g (x + w)) ^ 2) (volume.restrict (dbox η)) :=
+  have hdom : Integrable (fun w => 2 * (g x) ^ 2 + 2 * (g (x + w)) ^ 2)
+      (volume.restrict (dbox η)) :=
     ((integrableOn_const (C := (g x) ^ 2) (volume_dbox_ne_top (n := n) η)).const_mul 2).add
       (hgxw2.const_mul 2)
   refine hdom.mono' haesm ?_
@@ -501,7 +509,8 @@ integral of the squared translation difference over the displacement box. -/
 theorem inner_displacement_le {η : ℝ} (k : Fin n → ℤ) (g : EucL2 n)
     {x : EuclideanSpace ℝ (Fin n)} (hx : x ∈ cube η k) :
     ∫ y in cube η k, (g x - g y) ^ 2 ≤ ∫ w in dbox η, (g x - g (x + w)) ^ 2 := by
-  have hmp : MeasurePreserving (fun w => x + w) (volume : Measure (EuclideanSpace ℝ (Fin n))) volume :=
+  have hmp : MeasurePreserving (fun w => x + w)
+      (volume : Measure (EuclideanSpace ℝ (Fin n))) volume :=
     measurePreserving_add_left volume x
   have hemb : MeasurableEmbedding (fun w : EuclideanSpace ℝ (Fin n) => x + w) :=
     (MeasurableEquiv.addLeft x).measurableEmbedding
@@ -533,7 +542,8 @@ controlled by the translation modulus integrated over the displacement box. -/
 theorem sum_cube_double_le_translation {η : ℝ} (hη : 0 < η) (K : Finset (Fin n → ℤ)) (g : EucL2 n) :
     ∑ k ∈ K, ∫ x in cube η k, ∫ y in cube η k, (g x - g y) ^ 2
       ≤ ∫ w in dbox η, ‖transL2 w g - g‖ ^ 2 := by
-  set Hfun : EuclideanSpace ℝ (Fin n) → ℝ := fun x => ∫ w in dbox η, (g x - g (x + w)) ^ 2 with hHfun
+  set Hfun : EuclideanSpace ℝ (Fin n) → ℝ :=
+    fun x => ∫ w in dbox η, (g x - g (x + w)) ^ 2 with hHfun
   have hHint : Integrable Hfun volume :=
     (integrable_prod_displacement g (volume_dbox_ne_top η)).integral_prod_left
   have hHnn : ∀ x, 0 ≤ Hfun x := fun x => integral_nonneg (fun w => sq_nonneg _)
@@ -542,7 +552,8 @@ theorem sum_cube_double_le_translation {η : ℝ} (hη : 0 < η) (K : Finset (Fi
     refine Finset.sum_le_sum (fun k _ => ?_)
     have hFinner : IntegrableOn (fun x => ∫ y in cube η k, (g x - g y) ^ 2) (cube η k) volume := by
       have hprod : Integrable (fun p : EuclideanSpace ℝ (Fin n) × EuclideanSpace ℝ (Fin n) =>
-          (g p.1 - g p.2) ^ 2) ((volume.restrict (cube η k)).prod (volume.restrict (cube η k))) := by
+          (g p.1 - g p.2) ^ 2)
+          ((volume.restrict (cube η k)).prod (volume.restrict (cube η k))) := by
         rw [Measure.prod_restrict]
         exact integrableOn_prod_sq_sub g (volume_cube_ne_top η k) (volume_cube_ne_top η k)
       exact hprod.integral_prod_left
@@ -555,7 +566,8 @@ theorem sum_cube_double_le_translation {η : ℝ} (hη : 0 < η) (K : Finset (Fi
       exact Finset.sum_congr rfl (fun k _ => (integral_indicator (measurableSet_cube η k)).symm)
     rw [heq]
     refine integral_mono (integrable_finsetSum K (fun k _ =>
-      (integrable_indicator_iff (measurableSet_cube η k)).mpr hHint.integrableOn)) hHint (fun x => ?_)
+      (integrable_indicator_iff (measurableSet_cube η k)).mpr hHint.integrableOn))
+      hHint (fun x => ?_)
     by_cases hx : ∃ k ∈ K, x ∈ cube η k
     · obtain ⟨k₀, hk₀, hx₀⟩ := hx
       refine le_of_eq ?_
@@ -638,7 +650,7 @@ theorem integrableOn_dbox_translation_modulus {η : ℝ} (g : EucL2 n) :
     IntegrableOn (fun w => ‖transL2 w g - g‖ ^ 2) (dbox η) volume := by
   refine ((integrable_prod_displacement g (volume_dbox_ne_top η)).integral_prod_right).congr ?_
   refine Filter.Eventually.of_forall (fun w => ?_)
-  show ∫ x, ((g : EuclideanSpace ℝ (Fin n) → ℝ) x - g (x + w)) ^ 2 = ‖transL2 w g - g‖ ^ 2
+  change ∫ x, ((g : EuclideanSpace ℝ (Fin n) → ℝ) x - g (x + w)) ^ 2 = ‖transL2 w g - g‖ ^ 2
   rw [norm_sq_transL2_sub]
   exact integral_congr_ae (Filter.Eventually.of_forall fun x => by ring)
 
