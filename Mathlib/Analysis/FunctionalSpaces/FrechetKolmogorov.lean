@@ -459,7 +459,7 @@ theorem integrableOn_dbox_sq_sub_translate {η : ℝ} (g : EucL2 n) (x : Euclide
 
 /-- **Displacement substitution.** On a cube the integral of the squared difference is at most the
 integral of the squared translation difference over the displacement box. -/
-theorem inner_displacement_le {η : ℝ} (hη : 0 < η) (k : Fin n → ℤ) (g : EucL2 n)
+theorem inner_displacement_le {η : ℝ} (k : Fin n → ℤ) (g : EucL2 n)
     {x : EuclideanSpace ℝ (Fin n)} (hx : x ∈ cube η k) :
     ∫ y in cube η k, (g x - g y) ^ 2 ≤ ∫ w in dbox η, (g x - g (x + w)) ^ 2 := by
   have hmp : MeasurePreserving (fun w => x + w) (volume : Measure (EuclideanSpace ℝ (Fin n))) volume :=
@@ -488,6 +488,49 @@ theorem integral_displacement_marginal (g : EucL2 n) {D : Set (EuclideanSpace �
   refine setIntegral_congr_fun hD (fun w _ => ?_)
   rw [norm_sq_transL2_sub]
   exact integral_congr_ae (Filter.Eventually.of_forall fun x => by ring)
+
+/-- **The cube-translation bound.** Summing the per-cube double integrals over the grid is
+controlled by the translation modulus integrated over the displacement box. -/
+theorem sum_cube_double_le_translation {η : ℝ} (hη : 0 < η) (K : Finset (Fin n → ℤ)) (g : EucL2 n) :
+    ∑ k ∈ K, ∫ x in cube η k, ∫ y in cube η k, (g x - g y) ^ 2
+      ≤ ∫ w in dbox η, ‖transL2 w g - g‖ ^ 2 := by
+  set Hfun : EuclideanSpace ℝ (Fin n) → ℝ := fun x => ∫ w in dbox η, (g x - g (x + w)) ^ 2 with hHfun
+  have hHint : Integrable Hfun volume :=
+    (integrable_prod_displacement g (volume_dbox_ne_top η)).integral_prod_left
+  have hHnn : ∀ x, 0 ≤ Hfun x := fun x => integral_nonneg (fun w => sq_nonneg _)
+  have step1 : ∑ k ∈ K, ∫ x in cube η k, ∫ y in cube η k, (g x - g y) ^ 2
+      ≤ ∑ k ∈ K, ∫ x in cube η k, Hfun x := by
+    refine Finset.sum_le_sum (fun k _ => ?_)
+    have hFinner : IntegrableOn (fun x => ∫ y in cube η k, (g x - g y) ^ 2) (cube η k) volume := by
+      have hprod : Integrable (fun p : EuclideanSpace ℝ (Fin n) × EuclideanSpace ℝ (Fin n) =>
+          (g p.1 - g p.2) ^ 2) ((volume.restrict (cube η k)).prod (volume.restrict (cube η k))) := by
+        rw [Measure.prod_restrict]
+        exact integrableOn_prod_sq_sub g (volume_cube_ne_top η k) (volume_cube_ne_top η k)
+      exact hprod.integral_prod_left
+    exact setIntegral_mono_on hFinner hHint.integrableOn (measurableSet_cube η k)
+      (fun x hx => inner_displacement_le k g hx)
+  have step2 : ∑ k ∈ K, ∫ x in cube η k, Hfun x ≤ ∫ x, Hfun x := by
+    have heq : ∑ k ∈ K, ∫ x in cube η k, Hfun x = ∫ x, ∑ k ∈ K, (cube η k).indicator Hfun x := by
+      rw [integral_finsetSum K (fun k _ => (integrable_indicator_iff (measurableSet_cube η k)).mpr
+        hHint.integrableOn)]
+      exact Finset.sum_congr rfl (fun k _ => (integral_indicator (measurableSet_cube η k)).symm)
+    rw [heq]
+    refine integral_mono (integrable_finsetSum K (fun k _ =>
+      (integrable_indicator_iff (measurableSet_cube η k)).mpr hHint.integrableOn)) hHint (fun x => ?_)
+    by_cases hx : ∃ k ∈ K, x ∈ cube η k
+    · obtain ⟨k₀, hk₀, hx₀⟩ := hx
+      refine le_of_eq ?_
+      rw [Finset.sum_eq_single k₀
+        (fun k _ hne => Set.indicator_of_notMem
+          (fun hxk => absurd hx₀ (Set.disjoint_left.mp (cube_disjoint hη hne) hxk)) _)
+        (fun h => absurd hk₀ h), Set.indicator_of_mem hx₀]
+    · simp only [not_exists, not_and] at hx
+      rw [Finset.sum_eq_zero (fun k hk => Set.indicator_of_notMem (hx k hk) _)]
+      exact hHnn x
+  calc ∑ k ∈ K, ∫ x in cube η k, ∫ y in cube η k, (g x - g y) ^ 2
+      ≤ ∫ x, Hfun x := step1.trans step2
+    _ = ∫ w in dbox η, ‖transL2 w g - g‖ ^ 2 :=
+        integral_displacement_marginal g (measurableSet_dbox η) (volume_dbox_ne_top η)
 
 /-- **Per-cube variance bound (Jensen).** The squared deviation of `g` from its average on a cube
 is at most the rescaled double integral of the squared difference over that cube. -/
