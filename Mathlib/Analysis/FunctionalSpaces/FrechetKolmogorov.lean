@@ -202,6 +202,10 @@ theorem volume_dbox_ne_top (η : ℝ) :
     volume (dbox η : Set (EuclideanSpace ℝ (Fin n))) ≠ ⊤ := by
   rw [volume_dbox]; exact (ENNReal.pow_lt_top ENNReal.ofReal_lt_top).ne
 
+theorem volume_real_dbox {η : ℝ} (hη : 0 ≤ η) :
+    volume.real (dbox η : Set (EuclideanSpace ℝ (Fin n))) = (2 * η) ^ n := by
+  rw [Measure.real, volume_dbox, ENNReal.toReal_pow, ENNReal.toReal_ofReal (by linarith)]
+
 /-- The coordinate difference of two points in a common cube lies in the displacement box. -/
 theorem sub_mem_dbox_of_mem_cube {η : ℝ} {k : Fin n → ℤ} {x y : EuclideanSpace ℝ (Fin n)}
     (hx : x ∈ cube η k) (hy : y ∈ cube η k) : y - x ∈ dbox η := by
@@ -593,5 +597,41 @@ theorem norm_sq_sub_avg_le_translation {η : ℝ} (hη : 0 < η) {K : Finset (Fi
     _ ≤ (η ^ n)⁻¹ * ∫ w in dbox η, ‖transL2 w g - g‖ ^ 2 :=
         mul_le_mul_of_nonneg_left (sum_cube_double_le_translation hη K g)
           (inv_nonneg.mpr (pow_nonneg hη.le n))
+
+/-- The translation modulus is integrable over the displacement box. -/
+theorem integrableOn_dbox_translation_modulus {η : ℝ} (g : EucL2 n) :
+    IntegrableOn (fun w => ‖transL2 w g - g‖ ^ 2) (dbox η) volume := by
+  refine ((integrable_prod_displacement g (volume_dbox_ne_top η)).integral_prod_right).congr ?_
+  refine Filter.Eventually.of_forall (fun w => ?_)
+  show ∫ x, ((g : EuclideanSpace ℝ (Fin n) → ℝ) x - g (x + w)) ^ 2 = ‖transL2 w g - g‖ ^ 2
+  rw [norm_sq_transL2_sub]
+  exact integral_congr_ae (Filter.Eventually.of_forall fun x => by ring)
+
+/-- **The constant approximation bound.** With a uniform Lipschitz translation modulus `Λ`, the
+cube-average approximates `g` within `2 ^ n * n * Λ ^ 2 * η ^ 2` in squared `L²` norm. -/
+theorem norm_sq_sub_avg_le_const {η : ℝ} (hη : 0 < η) {K : Finset (Fin n → ℤ)} {g : EucL2 n}
+    {Λ : ℝ}
+    (hsupp : ∀ᵐ x ∂volume, x ∉ (⋃ k ∈ K, cube η k) → g x = 0)
+    (hmod : ∀ h, ‖transL2 h g - g‖ ≤ Λ * ‖h‖) :
+    ‖g - avg η K g‖ ^ 2 ≤ 2 ^ n * n * Λ ^ 2 * η ^ 2 := by
+  have hne : (η : ℝ) ^ n ≠ 0 := (pow_pos hη n).ne'
+  have hbound : ∫ w in dbox η, ‖transL2 w g - g‖ ^ 2 ≤ (2 * η) ^ n * (Λ ^ 2 * (n * η ^ 2)) := by
+    have hpt : ∀ w ∈ dbox η, ‖transL2 w g - g‖ ^ 2 ≤ Λ ^ 2 * (n * η ^ 2) := by
+      intro w hw
+      have h1 : ‖transL2 w g - g‖ ^ 2 ≤ (Λ * ‖w‖) ^ 2 :=
+        pow_le_pow_left₀ (norm_nonneg _) (hmod w) 2
+      have h2 : ‖w‖ ^ 2 ≤ n * η ^ 2 := normSq_le_of_mem_dbox hw
+      nlinarith [norm_nonneg w, normSq_le_of_mem_dbox hw, sq_nonneg Λ]
+    calc ∫ w in dbox η, ‖transL2 w g - g‖ ^ 2
+        ≤ ∫ _w in dbox η, Λ ^ 2 * (n * η ^ 2) :=
+          setIntegral_mono_on (integrableOn_dbox_translation_modulus g)
+            (integrableOn_const (volume_dbox_ne_top η)) (measurableSet_dbox η) hpt
+      _ = (2 * η) ^ n * (Λ ^ 2 * (n * η ^ 2)) := by
+          rw [setIntegral_const, smul_eq_mul, volume_real_dbox hη.le]
+  calc ‖g - avg η K g‖ ^ 2 ≤ (η ^ n)⁻¹ * ∫ w in dbox η, ‖transL2 w g - g‖ ^ 2 :=
+        norm_sq_sub_avg_le_translation hη hsupp
+    _ ≤ (η ^ n)⁻¹ * ((2 * η) ^ n * (Λ ^ 2 * (n * η ^ 2))) :=
+        mul_le_mul_of_nonneg_left hbound (inv_nonneg.mpr (pow_nonneg hη.le n))
+    _ = 2 ^ n * n * Λ ^ 2 * η ^ 2 := by rw [mul_pow]; field_simp
 
 end MeasureTheory
