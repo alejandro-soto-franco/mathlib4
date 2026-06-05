@@ -172,6 +172,58 @@ theorem coord_dist_lt_of_mem_cube {η : ℝ} {k : Fin n → ℤ} {x y : Euclidea
   obtain ⟨hl', hu'⟩ := hy i
   rw [abs_lt]; constructor <;> linarith
 
+/-! ### The displacement box -/
+
+/-- The open displacement box `(-η, η)ⁿ` in `EuclideanSpace ℝ (Fin n)`: the set of admissible
+differences of two points sharing a side-`η` cube. -/
+def dbox (η : ℝ) : Set (EuclideanSpace ℝ (Fin n)) :=
+  WithLp.ofLp ⁻¹' Set.univ.pi (fun _ => Set.Ioo (-η) η)
+
+theorem mem_dbox {η : ℝ} {w : EuclideanSpace ℝ (Fin n)} :
+    w ∈ dbox η ↔ ∀ i, w i ∈ Set.Ioo (-η) η := by
+  simp only [dbox, mem_preimage, Set.mem_univ_pi]
+
+theorem measurableSet_dbox (η : ℝ) : MeasurableSet (dbox η : Set (EuclideanSpace ℝ (Fin n))) :=
+  (PiLp.volume_preserving_ofLp (ι := Fin n)).measurable
+    (MeasurableSet.univ_pi fun _ => measurableSet_Ioo)
+
+theorem volume_dbox (η : ℝ) :
+    volume (dbox η : Set (EuclideanSpace ℝ (Fin n))) = (ENNReal.ofReal (2 * η)) ^ n := by
+  have hbox : volume (Set.univ.pi (fun _ : Fin n => Set.Ioo (-η) η))
+      = (ENNReal.ofReal (2 * η)) ^ n := by
+    rw [volume_pi_pi]
+    have hone : ∀ i : Fin n, volume (Set.Ioo (-η) η) = ENNReal.ofReal (2 * η) := by
+      intro i; rw [Real.volume_Ioo]; congr 1; ring
+    rw [Finset.prod_congr rfl (fun i _ => hone i)]; simp
+  rw [dbox, (PiLp.volume_preserving_ofLp (ι := Fin n)).measure_preimage
+        (MeasurableSet.univ_pi fun _ => measurableSet_Ioo).nullMeasurableSet, hbox]
+
+theorem volume_dbox_ne_top (η : ℝ) :
+    volume (dbox η : Set (EuclideanSpace ℝ (Fin n))) ≠ ⊤ := by
+  rw [volume_dbox]; exact (ENNReal.pow_lt_top ENNReal.ofReal_lt_top).ne
+
+/-- The coordinate difference of two points in a common cube lies in the displacement box. -/
+theorem sub_mem_dbox_of_mem_cube {η : ℝ} {k : Fin n → ℤ} {x y : EuclideanSpace ℝ (Fin n)}
+    (hx : x ∈ cube η k) (hy : y ∈ cube η k) : y - x ∈ dbox η := by
+  rw [mem_dbox]
+  intro i
+  have h := coord_dist_lt_of_mem_cube hx hy i
+  rw [abs_lt] at h
+  simp only [Set.mem_Ioo, PiLp.sub_apply]
+  constructor <;> linarith [h.1, h.2]
+
+/-- A point of the displacement box has squared norm at most `n * η ^ 2`. -/
+theorem normSq_le_of_mem_dbox {η : ℝ} {w : EuclideanSpace ℝ (Fin n)} (hw : w ∈ dbox η) :
+    ‖w‖ ^ 2 ≤ n * η ^ 2 := by
+  rw [EuclideanSpace.norm_eq, Real.sq_sqrt (Finset.sum_nonneg fun i _ => by positivity)]
+  rw [mem_dbox] at hw
+  calc ∑ i, ‖w i‖ ^ 2 ≤ ∑ _i : Fin n, η ^ 2 := by
+        refine Finset.sum_le_sum (fun i _ => ?_)
+        obtain ⟨hl, hu⟩ := hw i
+        rw [Real.norm_eq_abs, sq_abs]
+        nlinarith [hl, hu]
+    _ = n * η ^ 2 := by rw [Finset.sum_const, Finset.card_univ, Fintype.card_fin, nsmul_eq_mul]
+
 /-! ### The cube-averaging operator -/
 
 /-- The `L²` class of the indicator of the cube `cube η k`. -/
