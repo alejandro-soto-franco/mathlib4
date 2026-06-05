@@ -8,6 +8,7 @@ import Mathlib.MeasureTheory.Function.LpSpace.Indicator
 import Mathlib.MeasureTheory.Integral.Prod
 import Mathlib.MeasureTheory.Group.Integral
 import Mathlib.MeasureTheory.Measure.Haar.InnerProductSpace
+import Mathlib.MeasureTheory.Group.Prod
 import Mathlib.MeasureTheory.Constructions.Pi
 import Mathlib.MeasureTheory.Measure.Lebesgue.Basic
 import Mathlib.Analysis.Normed.Module.FiniteDimension
@@ -280,5 +281,82 @@ theorem norm_sq_sub_avg_eq {η : ℝ} (hη : 0 < η) {K : Finset (Fin n → ℤ)
     integral_finsetSum K (fun k _ => (integrable_indicator_iff (measurableSet_cube η k)).mpr
       (integrableOn_cube_sq_sub η k g _))]
   exact Finset.sum_congr rfl (fun k _ => integral_indicator (measurableSet_cube η k))
+
+/-! ### The cube-translation estimate -/
+
+/-- The squared difference `(g x - g y) ^ 2` is integrable over a product of finite-measure sets. -/
+theorem integrableOn_prod_sq_sub (g : EucL2 n) {s t : Set (EuclideanSpace ℝ (Fin n))}
+    (hμs : volume s ≠ ⊤) (hμt : volume t ≠ ⊤) :
+    IntegrableOn (fun p : EuclideanSpace ℝ (Fin n) × EuclideanSpace ℝ (Fin n) =>
+      (g p.1 - g p.2) ^ 2) (s ×ˢ t) (volume.prod volume) := by
+  haveI : IsFiniteMeasure (volume.restrict s) :=
+    ⟨by rw [Measure.restrict_apply_univ]; exact hμs.lt_top⟩
+  haveI : IsFiniteMeasure (volume.restrict t) :=
+    ⟨by rw [Measure.restrict_apply_univ]; exact hμt.lt_top⟩
+  rw [IntegrableOn, ← Measure.prod_restrict]
+  have hgs : AEStronglyMeasurable (g : EuclideanSpace ℝ (Fin n) → ℝ) (volume.restrict s) :=
+    (Lp.aestronglyMeasurable g).restrict
+  have hgt : AEStronglyMeasurable (g : EuclideanSpace ℝ (Fin n) → ℝ) (volume.restrict t) :=
+    (Lp.aestronglyMeasurable g).restrict
+  have hmeas : AEStronglyMeasurable (fun p : EuclideanSpace ℝ (Fin n) × EuclideanSpace ℝ (Fin n) =>
+      (g p.1 - g p.2) ^ 2) ((volume.restrict s).prod (volume.restrict t)) :=
+    ((hgs.comp_fst (ν := volume.restrict t)).sub (hgt.comp_snd (μ := volume.restrict s))).pow 2
+  have hg2s : Integrable (fun x => (g x) ^ 2) (volume.restrict s) :=
+    ((Lp.memLp g).restrict s).integrable_sq
+  have hg2t : Integrable (fun y => (g y) ^ 2) (volume.restrict t) :=
+    ((Lp.memLp g).restrict t).integrable_sq
+  have hdom : Integrable (fun p : EuclideanSpace ℝ (Fin n) × EuclideanSpace ℝ (Fin n) =>
+      2 * (g p.1) ^ 2 + 2 * (g p.2) ^ 2) ((volume.restrict s).prod (volume.restrict t)) :=
+    ((hg2s.comp_fst (volume.restrict t)).const_mul 2).add ((hg2t.comp_snd (volume.restrict s)).const_mul 2)
+  refine hdom.mono' hmeas ?_
+  filter_upwards with p
+  rw [Real.norm_eq_abs, abs_of_nonneg (by positivity)]
+  nlinarith [sq_nonneg (g p.1 - g p.2), sq_nonneg (g p.1 + g p.2)]
+
+/-- **Per-cube variance bound (Jensen).** The squared deviation of `g` from its average on a cube
+is at most the rescaled double integral of the squared difference over that cube. -/
+theorem cube_variance_le {η : ℝ} (hη : 0 < η) (k : Fin n → ℤ) (g : EucL2 n) :
+    ∫ x in cube η k, (g x - cubeCoef η k g) ^ 2
+      ≤ (η ^ n)⁻¹ * ∫ x in cube η k, ∫ y in cube η k, (g x - g y) ^ 2 := by
+  have hηn : (0 : ℝ) < η ^ n := pow_pos hη n
+  have hne : (η : ℝ) ^ n ≠ 0 := hηn.ne'
+  have hμreal : volume.real (cube η k) = η ^ n := volume_real_cube hη.le k
+  have hμne : volume (cube η k) ≠ ⊤ := volume_cube_ne_top η k
+  have hgint : IntegrableOn (g : EuclideanSpace ℝ (Fin n) → ℝ) (cube η k) volume :=
+    integrableOn_Lp_of_measure_ne_top g (by norm_num) hμne
+  have hmarg : IntegrableOn (fun x => ∫ y in cube η k, (g x - g y) ^ 2) (cube η k) volume := by
+    have hprod : Integrable (fun p : EuclideanSpace ℝ (Fin n) × EuclideanSpace ℝ (Fin n) =>
+        (g p.1 - g p.2) ^ 2)
+        ((volume.restrict (cube η k)).prod (volume.restrict (cube η k))) := by
+      rw [Measure.prod_restrict]; exact integrableOn_prod_sq_sub g hμne hμne
+    exact hprod.integral_prod_left
+  have hpt_eq : ∀ x, (g x - cubeCoef η k g) = (η ^ n)⁻¹ * ∫ y in cube η k, (g x - g y) := by
+    intro x
+    have hI : ∫ y in cube η k, (g x - g y) = (η ^ n) * g x - ∫ y in cube η k, g y := by
+      rw [integral_sub (integrableOn_const (C := g x) hμne) hgint, setIntegral_const, smul_eq_mul,
+        hμreal]
+    rw [hI, cubeCoef, hμreal]; field_simp
+  have hpt_le : ∀ x ∈ cube η k,
+      (g x - cubeCoef η k g) ^ 2 ≤ (η ^ n)⁻¹ * ∫ y in cube η k, (g x - g y) ^ 2 := by
+    intro x _
+    have hsqint : IntegrableOn (fun y => (g x - g y) ^ 2) (cube η k) volume := by
+      have heq : (fun y => (g x - g y) ^ 2)
+          = (fun y => ((g : EuclideanSpace ℝ (Fin n) → ℝ) y - g x) ^ 2) := by funext y; ring
+      rw [heq]; exact integrableOn_cube_sq_sub η k g (g x)
+    have hcs : (∫ y in cube η k, (g x - g y)) ^ 2 ≤ (η ^ n) * ∫ y in cube η k, (g x - g y) ^ 2 := by
+      have := sq_setIntegral_le (measurableSet_cube η k) hμne
+        ((integrableOn_const (C := g x) hμne).sub hgint) hsqint
+      rwa [hμreal] at this
+    rw [hpt_eq x, mul_pow]
+    calc ((η ^ n)⁻¹) ^ 2 * (∫ y in cube η k, (g x - g y)) ^ 2
+        ≤ ((η ^ n)⁻¹) ^ 2 * ((η ^ n) * ∫ y in cube η k, (g x - g y) ^ 2) :=
+          mul_le_mul_of_nonneg_left hcs (by positivity)
+      _ = (η ^ n)⁻¹ * ∫ y in cube η k, (g x - g y) ^ 2 := by rw [sq]; field_simp
+  calc ∫ x in cube η k, (g x - cubeCoef η k g) ^ 2
+      ≤ ∫ x in cube η k, (η ^ n)⁻¹ * ∫ y in cube η k, (g x - g y) ^ 2 :=
+        setIntegral_mono_on (integrableOn_cube_sq_sub η k g _) (hmarg.const_mul _)
+          (measurableSet_cube η k) hpt_le
+    _ = (η ^ n)⁻¹ * ∫ x in cube η k, ∫ y in cube η k, (g x - g y) ^ 2 := by
+        rw [integral_const_mul]
 
 end MeasureTheory
