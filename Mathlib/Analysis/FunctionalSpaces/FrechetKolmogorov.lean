@@ -432,6 +432,16 @@ theorem integrable_prod_displacement (g : EucL2 n) {D : Set (EuclideanSpace ℝ 
   rw [abs_of_nonneg (by positivity)]
   nlinarith [sq_nonneg (g p.1 - g (p.1 + p.2)), sq_nonneg (g p.1 + g (p.1 + p.2))]
 
+/-- **Tonelli marginal.** Swapping the order of integration turns the displacement integral into
+the translation modulus integrated over the displacement set. -/
+theorem integral_displacement_marginal (g : EucL2 n) {D : Set (EuclideanSpace ℝ (Fin n))}
+    (hD : MeasurableSet D) (hμD : volume D ≠ ⊤) :
+    ∫ x, ∫ w in D, (g x - g (x + w)) ^ 2 = ∫ w in D, ‖transL2 w g - g‖ ^ 2 := by
+  rw [integral_integral_swap (integrable_prod_displacement g hμD)]
+  refine setIntegral_congr_fun hD (fun w _ => ?_)
+  rw [norm_sq_transL2_sub]
+  exact integral_congr_ae (Filter.Eventually.of_forall fun x => by ring)
+
 /-- **Per-cube variance bound (Jensen).** The squared deviation of `g` from its average on a cube
 is at most the rescaled double integral of the squared difference over that cube. -/
 theorem cube_variance_le {η : ℝ} (hη : 0 < η) (k : Fin n → ℤ) (g : EucL2 n) :
