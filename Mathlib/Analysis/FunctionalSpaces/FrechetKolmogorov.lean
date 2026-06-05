@@ -432,6 +432,53 @@ theorem integrable_prod_displacement (g : EucL2 n) {D : Set (EuclideanSpace ℝ 
   rw [abs_of_nonneg (by positivity)]
   nlinarith [sq_nonneg (g p.1 - g (p.1 + p.2)), sq_nonneg (g p.1 + g (p.1 + p.2))]
 
+/-- The squared difference of `g` at `x` and `x + w` is integrable over the displacement box. -/
+theorem integrableOn_dbox_sq_sub_translate {η : ℝ} (g : EucL2 n) (x : EuclideanSpace ℝ (Fin n)) :
+    IntegrableOn (fun w => (g x - g (x + w)) ^ 2) (dbox η) volume := by
+  haveI : IsFiniteMeasure (volume.restrict (dbox η : Set (EuclideanSpace ℝ (Fin n)))) :=
+    ⟨by rw [Measure.restrict_apply_univ]; exact (volume_dbox_ne_top (n := n) η).lt_top⟩
+  have hmp : MeasurePreserving (fun w => x + w) (volume : Measure (EuclideanSpace ℝ (Fin n))) volume :=
+    measurePreserving_add_left volume x
+  have hemb : MeasurableEmbedding (fun w : EuclideanSpace ℝ (Fin n) => x + w) :=
+    (MeasurableEquiv.addLeft x).measurableEmbedding
+  have hgxw2 : IntegrableOn (fun w => (g (x + w)) ^ 2) (dbox η) volume :=
+    ((hmp.integrable_comp_emb hemb).mpr (MemLp.integrable_sq (Lp.memLp g))).integrableOn
+  have haesm_gxw : AEStronglyMeasurable (fun w => g (x + w)) (volume.restrict (dbox η)) := by
+    have hmap : AEStronglyMeasurable (g : EuclideanSpace ℝ (Fin n) → ℝ)
+        (Measure.map (fun w => x + w) volume) := by rw [hmp.map_eq]; exact Lp.aestronglyMeasurable g
+    exact (hmap.comp_measurable (by fun_prop)).restrict
+  have haesm : AEStronglyMeasurable (fun w => (g x - g (x + w)) ^ 2) (volume.restrict (dbox η)) :=
+    (aestronglyMeasurable_const.sub haesm_gxw).pow 2
+  have hdom : Integrable (fun w => 2 * (g x) ^ 2 + 2 * (g (x + w)) ^ 2) (volume.restrict (dbox η)) :=
+    ((integrableOn_const (C := (g x) ^ 2) (volume_dbox_ne_top (n := n) η)).const_mul 2).add
+      (hgxw2.const_mul 2)
+  refine hdom.mono' haesm ?_
+  filter_upwards with w
+  rw [Real.norm_eq_abs, abs_of_nonneg (by positivity)]
+  nlinarith [sq_nonneg (g x - g (x + w)), sq_nonneg (g x + g (x + w))]
+
+/-- **Displacement substitution.** On a cube the integral of the squared difference is at most the
+integral of the squared translation difference over the displacement box. -/
+theorem inner_displacement_le {η : ℝ} (hη : 0 < η) (k : Fin n → ℤ) (g : EucL2 n)
+    {x : EuclideanSpace ℝ (Fin n)} (hx : x ∈ cube η k) :
+    ∫ y in cube η k, (g x - g y) ^ 2 ≤ ∫ w in dbox η, (g x - g (x + w)) ^ 2 := by
+  have hmp : MeasurePreserving (fun w => x + w) (volume : Measure (EuclideanSpace ℝ (Fin n))) volume :=
+    measurePreserving_add_left volume x
+  have hemb : MeasurableEmbedding (fun w : EuclideanSpace ℝ (Fin n) => x + w) :=
+    (MeasurableEquiv.addLeft x).measurableEmbedding
+  have hsub : ∫ y in cube η k, (g x - g y) ^ 2
+      = ∫ w in (fun w => x + w) ⁻¹' (cube η k), (g x - g (x + w)) ^ 2 :=
+    (hmp.setIntegral_preimage_emb hemb (fun y => (g x - g y) ^ 2) (cube η k)).symm
+  rw [hsub]
+  have hPsub : (fun w => x + w) ⁻¹' (cube η k) ⊆ dbox η := by
+    intro w hw
+    have hmem : x + w ∈ cube η k := hw
+    have hd := sub_mem_dbox_of_mem_cube hx hmem
+    simpa using hd
+  exact setIntegral_mono_set (integrableOn_dbox_sq_sub_translate g x)
+    (Filter.Eventually.of_forall fun w => sq_nonneg _)
+    (Filter.Eventually.of_forall fun w hw => hPsub hw)
+
 /-- **Tonelli marginal.** Swapping the order of integration turns the displacement integral into
 the translation modulus integrated over the displacement set. -/
 theorem integral_displacement_marginal (g : EucL2 n) {D : Set (EuclideanSpace ℝ (Fin n))}
