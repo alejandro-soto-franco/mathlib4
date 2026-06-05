@@ -365,6 +365,73 @@ theorem integrableOn_prod_sq_sub (g : EucL2 n) {s t : Set (EuclideanSpace ℝ (F
   rw [Real.norm_eq_abs, abs_of_nonneg (by positivity)]
   nlinarith [sq_nonneg (g p.1 - g p.2), sq_nonneg (g p.1 + g p.2)]
 
+/-- **The displacement product integrability.** The squared difference `(g x - g (x + w)) ^ 2`
+is integrable over `ℝⁿ × D` for any finite-measure `D` of displacements. This is the gateway to the
+Tonelli swap in the cube-translation estimate: the `w`-marginal of the integrand is the constant
+`‖g‖ ^ 2` (translation is an `L²` isometry), so `integrable_prod_iff'` closes. -/
+theorem integrable_prod_displacement (g : EucL2 n) {D : Set (EuclideanSpace ℝ (Fin n))}
+    (hμD : volume D ≠ ⊤) :
+    Integrable (fun p : EuclideanSpace ℝ (Fin n) × EuclideanSpace ℝ (Fin n) =>
+      (g p.1 - g (p.1 + p.2)) ^ 2) (volume.prod (volume.restrict D)) := by
+  haveI : IsFiniteMeasure (volume.restrict D) :=
+    ⟨by rw [Measure.restrict_apply_univ]; exact hμD.lt_top⟩
+  have hshear : MeasurePreserving
+      (fun p : EuclideanSpace ℝ (Fin n) × EuclideanSpace ℝ (Fin n) => (p.1, p.1 + p.2))
+      (volume.prod volume) (volume.prod volume) := measurePreserving_prod_add (μ := volume) (ν := volume)
+  have h1 : AEStronglyMeasurable
+      (fun q : EuclideanSpace ℝ (Fin n) × EuclideanSpace ℝ (Fin n) => g q.2) (volume.prod volume) :=
+    (Lp.aestronglyMeasurable g).comp_snd (μ := (volume : Measure (EuclideanSpace ℝ (Fin n))))
+  have hmeas_shear : Measurable
+      (fun p : EuclideanSpace ℝ (Fin n) × EuclideanSpace ℝ (Fin n) => (p.1, p.1 + p.2)) := by fun_prop
+  have haesm_add0 : AEStronglyMeasurable
+      (fun p : EuclideanSpace ℝ (Fin n) × EuclideanSpace ℝ (Fin n) => g (p.1 + p.2))
+      (volume.prod volume) := by
+    have hg' : AEStronglyMeasurable
+        (fun q : EuclideanSpace ℝ (Fin n) × EuclideanSpace ℝ (Fin n) => g q.2)
+        (Measure.map (fun p => (p.1, p.1 + p.2)) (volume.prod volume)) := by
+      rw [hshear.map_eq]; exact h1
+    exact hg'.comp_measurable hmeas_shear
+  have heqμ : volume.prod (volume.restrict D)
+      = (volume.prod (volume : Measure (EuclideanSpace ℝ (Fin n)))).restrict
+        ((Set.univ : Set (EuclideanSpace ℝ (Fin n))) ×ˢ D) := by
+    rw [← Measure.prod_restrict, Measure.restrict_univ]
+  have haesm_add : AEStronglyMeasurable (fun p => g (p.1 + p.2)) (volume.prod (volume.restrict D)) := by
+    rw [heqμ]; exact haesm_add0.restrict
+  have hmeas : AEStronglyMeasurable (fun p => (g p.1 - g (p.1 + p.2)) ^ 2)
+      (volume.prod (volume.restrict D)) :=
+    (((Lp.aestronglyMeasurable g).comp_fst (ν := volume.restrict D)).sub haesm_add).pow 2
+  have hI1 : Integrable (fun p : EuclideanSpace ℝ (Fin n) × EuclideanSpace ℝ (Fin n) => (g p.1) ^ 2)
+      (volume.prod (volume.restrict D)) :=
+    (MemLp.integrable_sq (Lp.memLp g)).comp_fst (volume.restrict D)
+  have haesm_sq : AEStronglyMeasurable (fun p : EuclideanSpace ℝ (Fin n) × EuclideanSpace ℝ (Fin n) =>
+      (g (p.1 + p.2)) ^ 2) (volume.prod (volume.restrict D)) := haesm_add.pow 2
+  have hI2 : Integrable (fun p => (g (p.1 + p.2)) ^ 2) (volume.prod (volume.restrict D)) := by
+    refine (integrable_prod_iff' haesm_sq).mpr ⟨Filter.Eventually.of_forall (fun w => ?_), ?_⟩
+    · simp only
+      have hcoe : (transL2 w g : EuclideanSpace ℝ (Fin n) → ℝ) =ᵐ[volume] fun x => g (x + w) :=
+        coeFn_transL2 w g
+      exact ((Lp.memLp (transL2 w g)).integrable_sq).congr
+        (by filter_upwards [hcoe] with x hx; rw [hx])
+    · have hmargfun : (fun w => ∫ x, ‖(g (x + w)) ^ 2‖)
+          = (fun _ : EuclideanSpace ℝ (Fin n) => ‖g‖ ^ 2) := by
+        funext w
+        have hnorm : ∫ x, ‖(g (x + w)) ^ 2‖ = ∫ x, (g (x + w)) ^ 2 :=
+          integral_congr_ae (Filter.Eventually.of_forall fun x => Real.norm_of_nonneg (sq_nonneg _))
+        rw [hnorm]
+        have hcoe : (transL2 w g : EuclideanSpace ℝ (Fin n) → ℝ) =ᵐ[volume] fun x => g (x + w) :=
+          coeFn_transL2 w g
+        calc ∫ x, (g (x + w)) ^ 2 = ∫ x, ((transL2 w g) x) ^ 2 := by
+              refine integral_congr_ae ?_; filter_upwards [hcoe] with x hx; rw [hx]
+          _ = ‖transL2 w g‖ ^ 2 := (norm_sq_eq_integral_sq _).symm
+          _ = ‖g‖ ^ 2 := by rw [(transL2 w).norm_map]
+      simp only
+      rw [hmargfun]; exact integrableOn_const (C := ‖g‖ ^ 2) hμD
+  refine ((hI1.const_mul 2).add (hI2.const_mul 2)).mono' hmeas ?_
+  filter_upwards with p
+  simp only [Pi.add_apply, Real.norm_eq_abs]
+  rw [abs_of_nonneg (by positivity)]
+  nlinarith [sq_nonneg (g p.1 - g (p.1 + p.2)), sq_nonneg (g p.1 + g (p.1 + p.2))]
+
 /-- **Per-cube variance bound (Jensen).** The squared deviation of `g` from its average on a cube
 is at most the rescaled double integral of the squared difference over that cube. -/
 theorem cube_variance_le {η : ℝ} (hη : 0 < η) (k : Fin n → ℤ) (g : EucL2 n) :
