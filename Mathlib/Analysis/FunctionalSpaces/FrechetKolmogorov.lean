@@ -794,5 +794,18 @@ theorem transL2_sub_le_of_tendsto {g : EucL2 n} {Λ : ℝ} {gk : ℕ → EucL2 n
     (((transL2 h).continuous.tendsto g).comp htend).sub htend
   exact le_of_tendsto hcont.norm (Filter.Eventually.of_forall (fun k => hmod k h))
 
+/-- A sharper limit form of `transL2_sub_le_of_tendsto`: the per-term moduli `Λ k` need only
+converge to `Λ`, not be uniformly bounded by it. This is the form a Sobolev function uses, since
+its smooth approximants carry gradient norms that converge to, but need not equal, its own. -/
+theorem transL2_sub_le_of_tendsto' {g : EucL2 n} {Λ : ℝ} {gk : ℕ → EucL2 n} {Λk : ℕ → ℝ}
+    (htend : Filter.Tendsto gk Filter.atTop (nhds g))
+    (hΛ : Filter.Tendsto Λk Filter.atTop (nhds Λ))
+    (hmod : ∀ k, ∀ h, ‖transL2 h (gk k) - gk k‖ ≤ Λk k * ‖h‖)
+    (h : EuclideanSpace ℝ (Fin n)) : ‖transL2 h g - g‖ ≤ Λ * ‖h‖ := by
+  have hcont : Filter.Tendsto (fun k => transL2 h (gk k) - gk k) Filter.atTop
+      (nhds (transL2 h g - g)) :=
+    (((transL2 h).continuous.tendsto g).comp htend).sub htend
+  exact le_of_tendsto_of_tendsto' hcont.norm (hΛ.mul_const ‖h‖) (fun k => hmod k h)
+
 end MeasureTheory
 
