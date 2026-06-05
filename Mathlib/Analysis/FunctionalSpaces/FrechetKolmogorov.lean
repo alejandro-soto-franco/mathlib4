@@ -578,4 +578,20 @@ theorem cube_variance_le {η : ℝ} (hη : 0 < η) (k : Fin n → ℤ) (g : EucL
     _ = (η ^ n)⁻¹ * ∫ x in cube η k, ∫ y in cube η k, (g x - g y) ^ 2 := by
         rw [integral_const_mul]
 
+/-- **The uniform approximation estimate.** For `g` supported in the union of the grid cubes, the
+squared `L²` distance from `g` to its cube-average is controlled by the translation modulus over the
+displacement box. -/
+theorem norm_sq_sub_avg_le_translation {η : ℝ} (hη : 0 < η) {K : Finset (Fin n → ℤ)} {g : EucL2 n}
+    (hsupp : ∀ᵐ x ∂volume, x ∉ (⋃ k ∈ K, cube η k) → g x = 0) :
+    ‖g - avg η K g‖ ^ 2 ≤ (η ^ n)⁻¹ * ∫ w in dbox η, ‖transL2 w g - g‖ ^ 2 := by
+  rw [norm_sq_sub_avg_eq hη hsupp]
+  calc ∑ k ∈ K, ∫ x in cube η k, (g x - cubeCoef η k g) ^ 2
+      ≤ ∑ k ∈ K, (η ^ n)⁻¹ * ∫ x in cube η k, ∫ y in cube η k, (g x - g y) ^ 2 :=
+        Finset.sum_le_sum (fun k _ => cube_variance_le hη k g)
+    _ = (η ^ n)⁻¹ * ∑ k ∈ K, ∫ x in cube η k, ∫ y in cube η k, (g x - g y) ^ 2 := by
+        rw [Finset.mul_sum]
+    _ ≤ (η ^ n)⁻¹ * ∫ w in dbox η, ‖transL2 w g - g‖ ^ 2 :=
+        mul_le_mul_of_nonneg_left (sum_cube_double_le_translation hη K g)
+          (inv_nonneg.mpr (pow_nonneg hη.le n))
+
 end MeasureTheory
