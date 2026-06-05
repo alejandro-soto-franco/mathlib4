@@ -63,6 +63,21 @@ theorem totallyBounded_of_approx {X : Type*} [PseudoMetricSpace X] {S : Set X}
     _ < ε / 2 + ε / 2 := by linarith
     _ = ε := by ring
 
+/-- **Total boundedness inside a finite-dimensional subspace.** A bounded subset of a
+finite-dimensional subspace of a real normed space is totally bounded in the ambient space. -/
+theorem totallyBounded_of_finiteDimensional_bounded {E : Type*} [NormedAddCommGroup E]
+    [NormedSpace ℝ E] (V : Submodule ℝ E) [FiniteDimensional ℝ V] {T : Set E}
+    (hTV : T ⊆ (V : Set E)) (hT : Bornology.IsBounded T) : TotallyBounded T := by
+  have hrange : T ⊆ Set.range V.subtypeₗᵢ := fun t ht => ⟨⟨t, hTV ht⟩, rfl⟩
+  have hpre : Bornology.IsBounded (V.subtypeₗᵢ ⁻¹' T) :=
+    V.subtypeₗᵢ.isometry.antilipschitz.isBounded_preimage hT
+  have htb : TotallyBounded (V.subtypeₗᵢ ⁻¹' T) :=
+    hpre.isCompact_closure.totallyBounded.subset subset_closure
+  have himg : V.subtypeₗᵢ '' (V.subtypeₗᵢ ⁻¹' T) = T := by
+    rw [Set.image_preimage_eq_inter_range, Set.inter_eq_left.mpr hrange]
+  rw [← himg]
+  exact htb.image V.subtypeₗᵢ.isometry.uniformContinuous
+
 namespace MeasureTheory
 
 /-! ### A finite-measure Cauchy-Schwarz bound -/
@@ -654,4 +669,112 @@ theorem norm_sq_sub_avg_le_const {η : ℝ} (hη : 0 < η) {K : Finset (Fin n �
         mul_le_mul_of_nonneg_left hbound (inv_nonneg.mpr (pow_nonneg hη.le n))
     _ = 2 ^ n * n * Λ ^ 2 * η ^ 2 := by rw [mul_pow]; field_simp
 
+/-! ### The Fréchet-Kolmogorov criterion -/
+
+/-- Each coordinate of a Euclidean vector is bounded in absolute value by the norm. -/
+theorem coord_abs_le_norm (x : EuclideanSpace ℝ (Fin n)) (i : Fin n) : |x i| ≤ ‖x‖ := by
+  rw [show |x i| = Real.sqrt ((x i) ^ 2) from (Real.sqrt_sq_eq_abs (x i)).symm,
+    EuclideanSpace.norm_eq]
+  apply Real.sqrt_le_sqrt
+  rw [show (x i) ^ 2 = ‖x i‖ ^ 2 from by rw [Real.norm_eq_abs, sq_abs]]
+  exact Finset.single_le_sum (f := fun j => ‖x j‖ ^ 2) (fun j _ => by positivity)
+    (Finset.mem_univ i)
+
+/-- **Coverage.** A closed ball of radius `R` is covered by the finitely many grid cubes of
+side `η` whose lattice index lies in a box scaled to `R / η`. -/
+theorem closedBall_subset_iUnion_cube {η : ℝ} (hη : 0 < η) (R : ℝ) :
+    Metric.closedBall (0 : EuclideanSpace ℝ (Fin n)) R ⊆
+      ⋃ k ∈ Fintype.piFinset (fun _ : Fin n => Finset.Icc (-(⌈R / η⌉ + 1)) (⌈R / η⌉ + 1)),
+        cube η k := by
+  intro x hx
+  rw [Metric.mem_closedBall, dist_zero_right] at hx
+  set k : Fin n → ℤ := fun i => ⌊x i / η⌋ with hk
+  have hmem : ∀ i, η * (k i : ℝ) ≤ x i ∧ x i < η * ((k i : ℝ) + 1) := by
+    intro i
+    refine ⟨?_, ?_⟩
+    · calc η * (k i : ℝ) ≤ η * (x i / η) :=
+            mul_le_mul_of_nonneg_left (Int.floor_le (x i / η)) hη.le
+        _ = x i := by field_simp
+    · calc x i = η * (x i / η) := by field_simp
+        _ < η * ((k i : ℝ) + 1) := mul_lt_mul_of_pos_left (Int.lt_floor_add_one (x i / η)) hη
+  have hxcube : x ∈ cube η k := by
+    rw [mem_cube]; intro i; exact ⟨(hmem i).1, (hmem i).2⟩
+  refine Set.mem_biUnion ?_ hxcube
+  rw [Finset.mem_coe, Fintype.mem_piFinset]
+  intro i
+  rw [Finset.mem_Icc]
+  have hxiR : |x i| ≤ R := (coord_abs_le_norm x i).trans hx
+  obtain ⟨hxle, hxlt⟩ := hmem i
+  have hub : k i ≤ ⌈R / η⌉ := by
+    have h1 : (k i : ℝ) ≤ R / η := by
+      rw [le_div_iff₀ hη, mul_comm]
+      exact hxle.trans (le_trans (le_abs_self (x i)) hxiR)
+    have h2 : (k i : ℝ) ≤ (⌈R / η⌉ : ℝ) := h1.trans (Int.le_ceil (R / η))
+    exact_mod_cast h2
+  have hlb : -(⌈R / η⌉ + 1) ≤ k i := by
+    have hge : -R ≤ x i := by linarith [neg_abs_le (x i), hxiR]
+    have hRlt : -R < ((k i : ℝ) + 1) * η := by rw [mul_comm]; exact lt_of_le_of_lt hge hxlt
+    have h1 : -(R / η) < (k i : ℝ) + 1 := by rw [← neg_div, div_lt_iff₀ hη]; exact hRlt
+    have h2 : -((⌈R / η⌉ : ℝ)) ≤ -(R / η) := by linarith [Int.le_ceil (R / η)]
+    have h3 : -((⌈R / η⌉ : ℝ)) < (k i : ℝ) + 1 := lt_of_le_of_lt h2 h1
+    have h4 : (-(⌈R / η⌉ + 1) : ℝ) < (k i : ℝ) := by linarith
+    exact_mod_cast h4.le
+  exact ⟨hlb, le_trans hub (by omega)⟩
+
+/-- **The Fréchet-Kolmogorov precompactness criterion.** A family `S` of `L²(ℝⁿ)` functions that
+is uniformly bounded in norm, uniformly supported in a fixed closed ball, and uniformly Lipschitz
+under translation (with modulus `Λ`) is totally bounded. This is the precompactness engine behind
+the Rellich-Kondrachov compact embedding. -/
+theorem totallyBounded_of_lipschitz_translation (S : Set (EucL2 n)) {R M Λ : ℝ}
+    (hbdd : ∀ g ∈ S, ‖g‖ ≤ M)
+    (hsupp : ∀ g ∈ S, ∀ᵐ x ∂volume,
+      x ∉ Metric.closedBall (0 : EuclideanSpace ℝ (Fin n)) R → g x = 0)
+    (hmod : ∀ g ∈ S, ∀ h, ‖transL2 h g - g‖ ≤ Λ * ‖h‖) :
+    TotallyBounded S := by
+  apply totallyBounded_of_approx
+  intro ε hε
+  set D : ℝ := 2 ^ n * n * Λ ^ 2 with hD
+  have hD0 : 0 ≤ D := by positivity
+  have hsqrt0 : 0 ≤ Real.sqrt D := Real.sqrt_nonneg _
+  have hden : 0 < Real.sqrt D + 1 := by linarith
+  set η : ℝ := ε / (Real.sqrt D + 1) with hη_def
+  have hη : 0 < η := div_pos hε hden
+  set K : Finset (Fin n → ℤ) :=
+    Fintype.piFinset (fun _ : Fin n => Finset.Icc (-(⌈R / η⌉ + 1)) (⌈R / η⌉ + 1)) with hK_def
+  have hDη : D * η ^ 2 < ε ^ 2 := by
+    have hs : Real.sqrt D ^ 2 = D := Real.sq_sqrt hD0
+    have hη2 : η ^ 2 * (Real.sqrt D + 1) ^ 2 = ε ^ 2 := by
+      rw [hη_def, div_pow]; field_simp
+    have key : D * η ^ 2 * (Real.sqrt D + 1) ^ 2 < ε ^ 2 * (Real.sqrt D + 1) ^ 2 :=
+      calc D * η ^ 2 * (Real.sqrt D + 1) ^ 2 = D * ε ^ 2 := by rw [mul_assoc, hη2]
+        _ < ε ^ 2 * (Real.sqrt D + 1) ^ 2 := by
+            nlinarith [hs, mul_nonneg (sq_nonneg ε) hsqrt0, mul_pos hε hε]
+    exact lt_of_mul_lt_mul_right key (by positivity)
+  have happrox : ∀ g ∈ S, ‖g - avg η K g‖ < ε := by
+    intro g hg
+    have hsupp' : ∀ᵐ x ∂volume, x ∉ (⋃ k ∈ K, cube η k) → g x = 0 := by
+      filter_upwards [hsupp g hg] with x hx
+      exact fun hxnc => hx (fun hb => hxnc (closedBall_subset_iUnion_cube hη R hb))
+    have hb : ‖g - avg η K g‖ ^ 2 ≤ D * η ^ 2 := by
+      rw [hD]; exact norm_sq_sub_avg_le_const hη hsupp' (hmod g hg)
+    have hlt : ‖g - avg η K g‖ ^ 2 < ε ^ 2 := lt_of_le_of_lt hb hDη
+    exact lt_of_pow_lt_pow_left₀ 2 hε.le hlt
+  refine ⟨avg η K '' S, ?_, ?_⟩
+  · haveI : FiniteDimensional ℝ (Submodule.span ℝ (cubeIndicator η '' (K : Set (Fin n → ℤ)))) :=
+      FiniteDimensional.span_of_finite ℝ (K.finite_toSet.image _)
+    refine totallyBounded_of_finiteDimensional_bounded
+      (Submodule.span ℝ (cubeIndicator η '' (K : Set (Fin n → ℤ)))) ?_ ?_
+    · rintro _ ⟨g, _, rfl⟩; exact avg_mem_span η K g
+    · apply (Metric.isBounded_closedBall (x := (0 : EucL2 n)) (r := M + ε)).subset
+      rintro _ ⟨g, hg, rfl⟩
+      rw [Metric.mem_closedBall, dist_zero_right]
+      have htri : ‖avg η K g‖ ≤ ‖g‖ + ‖g - avg η K g‖ :=
+        calc ‖avg η K g‖ = ‖g - (g - avg η K g)‖ := by congr 1; abel
+          _ ≤ ‖g‖ + ‖g - avg η K g‖ := norm_sub_le _ _
+      linarith [hbdd g hg, (happrox g hg).le]
+  · intro g hg
+    refine ⟨avg η K g, ⟨g, hg, rfl⟩, ?_⟩
+    rw [dist_eq_norm]; exact happrox g hg
+
 end MeasureTheory
+
